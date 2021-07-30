@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<config case="initial_state">
+
+	<add_executable source="model" dest="ocean_model"/>
+	<add_link source="../base_mesh/base_mesh.nc" dest="mesh.nc"/>
+	<add_link source="../base_mesh/graph.info" dest="graph.info"/>
+	<namelist name="namelist.ocean" mode="init">
+		<option name="config_init_configuration">'test_sht'</option>
+		<option name="config_ocean_run_mode">'init'</option>
+		<option name="config_test_sal_function_option">1</option>
+		<option name="config_test_sal_cosine_bell_lat_center">0.0</option>
+		<option name="config_test_sal_cosine_bell_lon_center">3.14159265</option>
+		<option name="config_test_sal_cosine_bell_radius">2123666.6667</option>
+		<option name="config_test_sal_cosine_bell_psi0">1.0</option>
+	</namelist>
+
+	<streams name="streams.ocean" keep="immutable" mode="init">
+		<stream name="input_init">
+			<attribute name="filename_template">mesh.nc</attribute>
+		</stream>
+		<stream name="output_init">
+			<attribute name="type">output</attribute>
+			<attribute name="output_interval">0000_00:00:01</attribute>
+			<attribute name="clobber_mode">truncate</attribute>
+			<attribute name="filename_template">initial_state.nc</attribute>
+			<add_contents>
+				<member name="input_init" type="stream"/>
+				<member name="ssh" type="var"/>
+				<member name="ssh_sal" type="var"/>
+			</add_contents>
+		</stream>
+	</streams>
+
+	<run_script name="run.py">
+	<step executable="gpmetis">
+	  <argument flag="graph.info">36</argument>
+	</step>
+	<model_run procs="1" threads="1" namelist="namelist.ocean" streams="streams.ocean"/>
+  </run_script>
+</config>
