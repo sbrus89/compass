@@ -14,7 +14,7 @@ class ParabolicBowl(TestGroup):
         """
         super().__init__(mpas_core=mpas_core, name='parabolic_bowl')
 
-        for resolution in [0.25, 1]:
+        for resolution in [5, 10, 20]:
             for coord_type in ['sigma', 'single_layer']:
                 self.add_test_case(
                     Default(test_group=self, resolution=resolution,

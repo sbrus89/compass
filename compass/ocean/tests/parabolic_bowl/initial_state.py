@@ -51,12 +51,11 @@ class InitialState(Step):
         section = config['vertical_grid']
         coord_type = self.coord_type
         if coord_type == 'single_layer':
-            options = {'config_tidal_boundary_vert_levels': '1'}
+            options = {'config_parabolic_bowl_vert_levels': '1'}
             self.update_namelist_at_runtime(options)
         else:
             vert_levels = section.get('vert_levels')
-            options = {'config_tidal_boundary_vert_levels': f'{vert_levels}',
-                       'config_tidal_boundary_layer_type': f"'{coord_type}'"}
+            options = {'config_parabolic_bowl_vert_levels': f'{vert_levels}'}
             self.update_namelist_at_runtime(options)
 
         section = config['parabolic_bowl']
@@ -65,7 +64,7 @@ class InitialState(Step):
         dc = section.getfloat('dc')
 
         logger.info(' * Make planar hex mesh')
-        dsMesh = make_planar_hex_mesh(nx=nx, ny=ny, dc=dc, nonperiodic_x=False,
+        dsMesh = make_planar_hex_mesh(nx=nx, ny=ny, dc=dc, nonperiodic_x=True,
                                       nonperiodic_y=True)
         logger.info(' * Completed Make planar hex mesh')
         write_netcdf(dsMesh, 'base_mesh.nc')

@@ -24,7 +24,7 @@ class Default(TestCase):
 
         Parameters
         ----------
-        test_group : compass.ocean.tests.parabolic_bowl.DryingSlope
+        test_group : compass.ocean.tests.parabolic_bowl.ParabolicBowl
             The test group that this test case belongs to
 
         resolution : float
@@ -37,6 +37,7 @@ class Default(TestCase):
 
         self.resolution = resolution
         self.coord_type = coord_type
+
         if resolution < 1.:
             res_name = f'{int(resolution*1e3)}m'
         else:
@@ -44,21 +45,11 @@ class Default(TestCase):
         subdir = f'{res_name}/{coord_type}/{name}'
         super().__init__(test_group=test_group, name=name,
                          subdir=subdir)
+
         self.add_step(InitialState(test_case=self, coord_type=coord_type))
-        if coord_type == 'single_layer':
-            self.add_step(Forward(test_case=self, resolution=resolution,
-                                  ntasks=4, openmp_threads=1,
-                                  coord_type=coord_type))
-            damping_coeffs = None
-        else:
-            damping_coeffs = [0.0025, 0.01]
-            for damping_coeff in damping_coeffs:
-                self.add_step(Forward(test_case=self, resolution=resolution,
-                                      ntasks=4, openmp_threads=1,
-                                      damping_coeff=damping_coeff,
-                                      coord_type=coord_type))
-        self.damping_coeffs = damping_coeffs
-        self.add_step(Viz(test_case=self, damping_coeffs=damping_coeffs))
+        self.add_step(Forward(test_case=self, resolution=resolution,
+                              coord_type=coord_type))
+        #self.add_step(Viz(test_case=self))
 
     def configure(self):
         """
@@ -67,11 +58,16 @@ class Default(TestCase):
 
         resolution = self.resolution
         config = self.config
-        ny = round(28 / resolution)
-        if resolution < 1.:
-            ny += 2
+
+        Lx = config.getint('parabolic_bowl','Lx')
+        Ly = config.getint('parabolic_bowl','Ly')
+
+        nx = round(Lx / resolution)
+        ny = round(Ly / resolution)
         dc = 1e3 * resolution
 
+        config.set('parabolic_bowl', 'nx', f'{nx}', comment='the number of '
+                   'mesh cells in the x direction')
         config.set('parabolic_bowl', 'ny', f'{ny}', comment='the number of '
                    'mesh cells in the y direction')
         config.set('parabolic_bowl', 'dc', f'{dc}', comment='the distance '
@@ -81,13 +77,6 @@ class Default(TestCase):
         """
         Validate variables against a baseline
         """
-        damping_coeffs = self.damping_coeffs
         variables = ['layerThickness', 'normalVelocity']
-        if damping_coeffs is not None:
-            for damping_coeff in damping_coeffs:
-                compare_variables(test_case=self, variables=variables,
-                                  filename1=f'forward_{damping_coeff}/'
-                                            'output.nc')
-        else:
-            compare_variables(test_case=self, variables=variables,
-                              filename1='forward/output.nc')
+        compare_variables(test_case=self, variables=variables,
+                          filename1='forward/output.nc')
