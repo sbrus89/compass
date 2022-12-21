@@ -1,7 +1,7 @@
 <streams>
 
 <immutable_stream name="mesh"
-                  filename_template="mesh.nc"/>
+                  filename_template="init.nc"/>
 
 <immutable_stream name="input"
                   filename_template="init.nc"/>
@@ -14,13 +14,6 @@
                   clobber_mode="truncate"
                   input_interval="initial_only"
                   output_interval="0005_00:00:00"/>
-
-<stream name="forcing"
-                  filename_template="forcing.nc"
-                  input_interval="initial_only"
-                  type="input">
-    <var name="tidalInputMask"/>
-</stream>
 
 <stream name="output"
         type="output"

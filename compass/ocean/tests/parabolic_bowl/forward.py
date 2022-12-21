@@ -58,14 +58,31 @@ class Forward(Step):
 
         self.add_model_as_input()
 
-        self.add_output_file(filename='output.nc')
+        #self.add_output_file(filename='output.nc')
 
     def setup(self):
         """
-        Set up the test case in the work directory, including downloading
-        and dependencies
+        Set up the test case in the work directory, including downloading any
+        dependencies
         """
+        self._get_resources()
 
-        self.ntasks = self.config.getint('parabolic_bowl', 'forward_ntasks')
-        self.min_tasks = self.config.getint('parabolic_bowl', 'forward_min_tasks')
-        self.threads = self.config.getint('parabolic_bowl', 'forward_threads')
+    def constrain_resources(self, available_cores):
+        """
+        Update resources at runtime from config options
+        """
+        self._get_resources()
+        super().constrain_resources(available_cores)
+
+    def run(self):
+        """
+        Run this step of the testcase
+        """
+        run_model(self)
+
+    def _get_resources(self):
+        # get the these properties from the config options
+        config = self.config
+        self.ntasks = config.getint('parabolic_bowl', 'forward_ntasks')
+        self.min_tasks = config.getint('parabolic_bowl', 'forward_min_tasks')
+        self.openmp_threads = config.getint('parabolic_bowl', 'forward_threads')
