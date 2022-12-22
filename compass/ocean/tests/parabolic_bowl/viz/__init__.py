@@ -1,32 +1,23 @@
 import os
-import xarray
-import numpy
+import xarray as xr
+import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
+import datetime as dt
 import subprocess
+from scipy.interpolate import LinearNDInterpolator
 
 from compass.step import Step
 
 
 class Viz(Step):
     """
-    A step for visualizing drying slope results, as well as comparison with
-    analytical solution and ROMS results.
+    A step for visualizing parabolic bowl results and
+    comparing with analytical solution
 
     Attributes
     ----------
-    damping_coeffs : list of float
-        Rayleigh damping coefficients used for the MPAS-Ocean and ROMS
-        forward runs
-
-    times : list of str
-        Time in days since the start of the simulation for which ROMS
-        comparison data is available
-
-    datatypes : list of str
-        The sources of data for comparison to the MPAS-Ocean run
     """
-    def __init__(self, test_case, damping_coeffs=None):
+    def __init__(self, test_case, resolutions):
         """
         Create the step
 
@@ -37,292 +28,125 @@ class Viz(Step):
         """
         super().__init__(test_case=test_case, name='viz')
 
-        times = ['0.05', '0.15', '0.25', '0.30', '0.40', '0.50']
-        datatypes = ['analytical', 'ROMS']
-        self.damping_coeffs = damping_coeffs
-        self.times = times
-        self.datatypes = datatypes
+        self.resolutions = resolutions
 
-        if damping_coeffs is None:
-            self.add_input_file(filename='output.nc',
-                                target='../forward/output.nc')
-        else:
-            for coeff in damping_coeffs:
-                self.add_input_file(filename=f'output_{coeff}.nc',
-                                    target=f'../forward_{coeff}/output.nc')
-                for time in times:
-                    for datatype in datatypes:
-                        filename = f'r{coeff}d{time}-{datatype.lower()}'\
-                                   '.csv'
-                        self.add_input_file(filename=filename, target=filename,
-                                            database='drying_slope')
+        for res in resolutions:
+            self.add_input_file(filename=f'output_{res}km.nc',
+                                target=f'../forward_{res}km/output.nc')
 
     def run(self):
         """
         Run this step of the test case
         """
-        section = self.config['paths']
-        datapath = section.get('ocean_database_root')
-        section = self.config['vertical_grid']
-        vert_levels = section.get('vert_levels')
-        section = self.config['drying_slope_viz']
-        generate_movie = section.getboolean('generate_movie')
 
-        self._plot_ssh_validation()
-        self._plot_ssh_time_series()
-        if generate_movie:
-            frames_per_second = section.getint('frames_per_second')
-            movie_format = section.get('movie_format')
-            outFolder = 'movie'
-            if not os.path.exists(outFolder):
-                try:
-                    os.makedirs(os.path.join(os.getcwd(), outFolder))
-                except OSError:
-                    pass
-            self._plot_ssh_validation_for_movie(outFolder=outFolder)
-            self._images_to_movies(framesPerSecond=frames_per_second,
-                                   outFolder=outFolder, extension=movie_format)
+        points = [[0,0],[300,0],[610,0]]
+        points = np.asarray(points)
+        points = points*1000
 
-    def _plot_ssh_time_series(self, outFolder='.'):
-        """
-        Plot ssh forcing on the right x boundary as a function of time against
-        the analytical solution. The agreement should be within machine
-        precision if the namelist options are consistent with the Warner et al.
-        (2013) test case.
-        """
-        colors = {'MPAS-O': 'k', 'analytical': 'b', 'ROMS': 'g'}
-        xSsh = numpy.linspace(0, 12.0, 100)
-        ySsh = 10.0*numpy.sin(xSsh*numpy.pi/12.0) - 10.0
+        fig, ax = plt.subplots(nrows=len(points),ncols=1)
 
-        figsize = [6.4, 4.8]
-        markersize = 20
+        for res in self.resolutions:
+            ds = xr.open_dataset(f'output_{res}km.nc')
 
-        damping_coeffs = self.damping_coeffs
-        if damping_coeffs is None:
-            naxes = 1
-            ncFilename = ['output.nc']
+            time = [dt.datetime.strptime(x.decode(),'%Y-%m-%d_%H:%M:%S') for x in ds.xtime.values]
+            t = np.asarray([(x-time[0]).total_seconds() for x in time])
+            
+
+            xy = np.vstack((ds.xCell.values, ds.yCell.values)).T
+            interp = LinearNDInterpolator(xy, ds.ssh.values.T)
+            
+            for i, pt in enumerate(points):
+
+                ssh = interp(pt).T
+                ax[i].plot(t, ssh, label=f'{res}km')
+
+        for i, pt in enumerate(points):
+            ssh_exact = self.exact_solution('zeta', pt[0], pt[1], t)
+            ax[i].plot(t,ssh_exact, label='exact')
+
+        for i, pt in enumerate(points):
+            ax[i].legend()
+            ax[i].set_xlabel('t')
+            ax[i].set_ylabel('ssh')
+            ax[i].set_title(f'Point ({pt[0]/1000}, {pt[1]/1000})')
+
+        fig.savefig(f'points.png', bbox_inches='tight')
+        
+
+    def exact_solution(self, var, x, y, t):
+
+        config = self.config
+
+        f = config.getfloat('parabolic_bowl', 'coriolis_parameter')
+        eta0 = config.getfloat('parabolic_bowl', 'eta_max')
+        b0 = config.getfloat('parabolic_bowl', 'depth_max')
+        omega = config.getfloat('parabolic_bowl', 'omega')
+        g = config.getfloat('parabolic_bowl', 'gravity')
+
+        x = np.asarray(x)
+        y = np.asarray(y)
+
+# paraminit.val = (paraminit.h0 + paraminit.zeta0)^2 ;
+# paraminit.CC = (paraminit.val - paraminit.h0^2.0)/(paraminit.val + paraminit.h0^2.0) ;
+# paraminit.Lb =  sqrt(8.0*paraminit.gg*paraminit.h0/ ... 
+#    (paraminit.omeg0*paraminit.omeg0 - paraminit.ff*paraminit.ff)) ;
+# L2 = Lb*Lb ;
+# r2 = xx.*xx + yy.*yy ;
+# num = 1 - CC*CC ;
+# den = 1.0/(1.0 - CC*cos(omeg0*t)) ;
+# hh0 = h0*( den*sqrt(num) - den*den*(r2/L2)*num ) ; 
+# hh0( hh0 < eps_dry ) = 0 ; 
+
+# invL = (1.0)/(param.Lb*param.Lb) ;
+# r2 = x.*x + y.*y ;
+# bxy = param.h0*(1.0 - invL*r2) ;
+
+        eps = 1.0e-12
+        r = np.sqrt(x*x + y*y)
+        L = np.sqrt(8.0*g*b0/(omega**2 - f**2))
+        C = ((b0 + eta0)**2 - b0**2)/((b0 + eta0)**2 + b0**2)
+        b = b0*(1.0 - r**2/L**2)
+        num = 1.0 - C**2
+        den = 1.0/(1.0 - C*np.cos(omega*t))
+        h = b0*(den*np.sqrt(num) - den**2*(r**2/L**2)*num)
+        h[h<eps] = 0.0 
+
+        if var == 'h':
+#         soln = hh0 ;
+            soln = h
+
+        elif var == 'zeta':
+#         soln = h0*( den*sqrt(num) - ... 
+#             1.0 - (r2/L2)*(den*den*num - 1.0) ) ; 
+#     
+#         idx = find( hh0 < eps_dry ) ; 
+#         if ( ~isempty(idx) )
+#             soln(idx) = -bxy(idx) ; 
+#         end 
+            soln = b0*(den*np.sqrt(num) - 1.0 - (r**2/L**2)*(den**2*num - 1.0))
+            soln[h<eps] = -b
+
+        elif var == 'u':
+#         soln = 0.5*den*( omeg0*xx*CC*sin(omeg0*t) - ff*yy*(sqrt(num) ... 
+#             + CC*cos(omeg0*t) - 1.0) ) ; 
+#     
+#         soln( hh0 < eps_dry ) = 0 ; 
+            soln = 0.5*den*(omega*x*C*np.sin(omega*t) - f*y*(np.sqrt(num) + C*np.cos(omega*t) - 1.0))
+            soln[h<eps] = 0
+
+        elif var == 'v':
+#         soln = 0.5*den*( omeg0*yy*CC*sin(omeg0*t) + ff*xx*(sqrt(num) ... 
+#             + CC*cos(omeg0*t) - 1.0) ) ; 
+#     
+#         soln( hh0 < eps_dry ) = 0 ; 
+            soln = 0.5*den*(omega*y*C*np.sin(omega*t) + f*x*(np.sqrt(num) + C*np.cos(omega*t) - 1.0))
+            soln[h<eps] = 0
+
+        elif var == 'r':
+#         soln = Lb*sqrt( (1 - CC*cos( omeg0*t))/sqrt(1 - CC*CC) ) ; 
+            soln = L*np.sqrt((1.0 - C*np.cos(omega*t))/np.sqrt(1.0 - C**2))
+
         else:
-            naxes = len(damping_coeffs)
-            ncFilename = [f'output_{damping_coeff}.nc'
-                          for damping_coeff in damping_coeffs]
-        fig, _ = plt.subplots(nrows=naxes, ncols=1, figsize=figsize, dpi=100)
+            print('Variable name not supported')
 
-        for i in range(naxes):
-            ax = plt.subplot(naxes, 1, i+1)
-            ds = xarray.open_dataset(ncFilename[i])
-            ssh = ds.ssh
-            ympas = ds.ssh.where(ds.tidalInputMask).mean('nCells').values
-            xmpas = numpy.linspace(0, 1.0, len(ds.xtime))*12.0
-            ax.plot(xmpas, ympas, marker='o', label='MPAS-O forward',
-                    color=colors['MPAS-O'])
-            ax.plot(xSsh, ySsh, lw=3, label='analytical',
-                    color=colors['analytical'])
-            ax.set_ylabel('Tidal amplitude (m)')
-            ax.set_xlabel('Time (hrs)')
-            ax.legend(frameon=False)
-            ax.label_outer()
-            ds.close()
-
-        fig.suptitle('Tidal amplitude forcing (right side)')
-        fig.savefig(f'{outFolder}/ssh_t.png', bbox_inches='tight', dpi=200)
-
-        plt.close(fig)
-
-    def _plot_ssh_validation(self, outFolder='.'):
-        """
-        Plot ssh as a function of along-channel distance for all times for
-        which there is validation data
-        """
-        colors = {'MPAS-O': 'k', 'analytical': 'b', 'ROMS': 'g'}
-
-        locs = [7.2, 2.2, 0.2, 1.2, 4.2, 9.3]
-        locs = 0.92 - numpy.divide(locs, 11.)
-
-        damping_coeffs = self.damping_coeffs
-        times = self.times
-        datatypes = self.datatypes
-
-        if damping_coeffs is None:
-            naxes = 1
-            nhandles = 1
-            ncFilename = ['output.nc']
-        else:
-            naxes = len(damping_coeffs)
-            nhandles = len(datatypes) + 1
-            ncFilename = [f'output_{damping_coeff}.nc'
-                          for damping_coeff in damping_coeffs]
-
-        xBed = numpy.linspace(0, 25, 100)
-        yBed = 10.0/25.0*xBed
-
-        fig, _ = plt.subplots(nrows=naxes, ncols=1, sharex=True)
-
-        for i in range(naxes):
-            ax = plt.subplot(naxes, 1, i+1)
-            ds = xarray.open_dataset(ncFilename[i])
-            ds = ds.drop_vars(numpy.setdiff1d([j for j in ds.variables],
-                                              ['yCell', 'ssh']))
-
-            ax.plot(xBed, yBed, '-k', lw=3)
-            ax.set_xlim(0, 25)
-            ax.set_ylim(-1, 11)
-            ax.invert_yaxis()
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.label_outer()
-
-            for atime, ay in zip(times, locs):
-
-                # Plot MPAS-O data
-                # factor of 1e- needed to account for annoying round-off issue
-                # to get right time slices
-                plottime = int((float(atime)/0.2 + 1e-16)*24.0)
-                ymean = ds.isel(Time=plottime).groupby('yCell').mean(
-                                dim=xarray.ALL_DIMS)
-                x = ymean.yCell.values/1000.0
-                y = ymean.ssh.values
-
-                mpas = ax.plot(x, -y, label='MPAS-O', color=colors['MPAS-O'])
-                ax.text(1, ay, atime + ' days', size=8,
-                        transform=ax.transAxes)
-                if damping_coeffs is not None:
-                    ax.text(0.5, 5, 'r = ' + str(damping_coeffs[i]))
-                    # Plot comparison data
-                    for datatype in datatypes:
-                        datafile = f'./r{damping_coeffs[i]}d{atime}-'\
-                                   f'{datatype.lower()}.csv'
-                        data = pd.read_csv(datafile, header=None)
-                        ax.scatter(data[0], data[1], marker='.',
-                                   color=colors[datatype], label=datatype)
-            ax.legend(frameon=False, loc='lower left')
-
-            ds.close()
-
-            h, l0 = ax.get_legend_handles_labels()
-            ax.legend(h[:nhandles], l0[:nhandles], frameon=False,
-                      loc='lower left')
-
-        fig.text(0.04, 0.5, 'Channel depth (m)', va='center',
-                 rotation='vertical')
-        fig.text(0.5, 0.02, 'Along channel distance (km)', ha='center')
-
-        fig.savefig(f'{outFolder}/ssh_depth_section.png', dpi=200)
-        plt.close(fig)
-
-    def _plot_ssh_validation_for_movie(self, outFolder='.'):
-        """
-        Compare ssh along the channel at different time slices with the
-        analytical solution and ROMS results.
-
-        Parameters
-        ----------
-
-        """
-        colors = {'MPAS-O': 'k', 'analytical': 'b', 'ROMS': 'g'}
-
-        locs = [7.2, 2.2, 0.2, 1.2, 4.2, 9.3]
-        locs = 0.92 - numpy.divide(locs, 11.)
-
-        damping_coeffs = self.damping_coeffs
-        if damping_coeffs is None:
-            naxes = 1
-            nhandles = 1
-            ncFilename = ['output.nc']
-        else:
-            naxes = len(damping_coeffs)
-            nhandles = naxes + 2
-            ncFilename = [f'output_{damping_coeff}.nc'
-                          for damping_coeff in damping_coeffs]
-
-        times = self.times
-        datatypes = self.datatypes
-
-        xBed = numpy.linspace(0, 25, 100)
-        yBed = 10.0/25.0*xBed
-
-        ii = 0
-        # Plot profiles over the 12h simulation duration
-        for itime in numpy.linspace(0, 0.5, 5*12+1):
-
-            plottime = int((float(itime)/0.2 + 1e-16)*24.0)
-
-            fig, _ = plt.subplots(nrows=naxes, ncols=1, sharex=True)
-
-            for i in range(naxes):
-                ax = plt.subplot(naxes, 1, i+1)
-                ds = xarray.open_dataset(ncFilename[i])
-                ds = ds.drop_vars(numpy.setdiff1d([j for j in ds.variables],
-                                                  ['yCell', 'ssh']))
-
-                # Plot MPAS-O snapshots
-                # factor of 1e- needed to account for annoying round-off issue
-                # to get right time slices
-                ymean = ds.isel(Time=plottime).groupby('yCell').mean(
-                                dim=xarray.ALL_DIMS)
-                x = ymean.yCell.values/1000.0
-                y = ymean.ssh.values
-                ax.plot(xBed, yBed, '-k', lw=3)
-                mpas = ax.plot(x, -y, label='MPAS-O', color=colors['MPAS-O'])
-
-                ax.set_ylim(-1, 11)
-                ax.set_xlim(0, 25)
-                ax.invert_yaxis()
-                ax.spines['top'].set_visible(False)
-                ax.spines['right'].set_visible(False)
-                ax.legend(frameon=False, loc='lower left')
-                ax.set_title(f't = {itime:.3f} days')
-                if damping_coeffs is not None:
-                    ax.text(0.5, 5, 'r = ' + str(damping_coeffs[i]))
-                    # Plot comparison data
-                    for atime, ay in zip(times, locs):
-                        ax.text(1, ay, f'{atime} days', size=8,
-                                transform=ax.transAxes)
-
-                        for datatype in datatypes:
-                            datafile = f'./r{damping_coeffs[i]}d{atime}-'\
-                                       f'{datatype.lower()}.csv'
-                            data = pd.read_csv(datafile, header=None)
-                            ax.scatter(data[0], data[1], marker='.',
-                                       color=colors[datatype], label=datatype)
-
-                h, l0 = ax.get_legend_handles_labels()
-                ax.legend(h[0:nhandles], l0[0:nhandles], frameon=False,
-                          loc='lower left')
-                ax.set_title(f't = {itime:.3f} days')
-
-                ds.close()
-
-            fig.text(0.04, 0.5, 'Channel depth (m)', va='center',
-                     rotation='vertical')
-            fig.text(0.5, 0.02, 'Along channel distance (km)', ha='center')
-
-            fig.savefig(f'{outFolder}/ssh_depth_section_{ii:03d}.png', dpi=200)
-
-            plt.close(fig)
-            ii += 1
-
-    def _images_to_movies(self, outFolder='.', framesPerSecond=30,
-                          extension='mp4', overwrite=True):
-        """
-        Convert all the image sequences into movies with ffmpeg
-        """
-        try:
-            os.makedirs(f'{outFolder}/logs')
-        except OSError:
-            pass
-
-        framesPerSecond = str(framesPerSecond)
-        prefix = 'ssh_depth_section'
-        outFileName = f'{outFolder}/{prefix}.{extension}'
-        if overwrite or not os.path.exists(outFileName):
-
-            imageFileTemplate = f'{outFolder}/{prefix}_%03d.png'
-            logFileName = f'{outFolder}/logs/{prefix}.log'
-            with open(logFileName, 'w') as logFile:
-                args = ['ffmpeg', '-y', '-r', framesPerSecond,
-                        '-i', imageFileTemplate, '-b:v', '32000k',
-                        '-r', framesPerSecond, '-pix_fmt', 'yuv420p',
-                        outFileName]
-                print_args = ' '.join(args)
-                print(f'running {print_args}')
-                subprocess.check_call(args, stdout=logFile, stderr=logFile)
+        return soln

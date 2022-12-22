@@ -14,7 +14,7 @@ class InitialState(Step):
     A step for creating a mesh and initial condition for drying slope test
     cases
     """
-    def __init__(self, test_case, coord_type='sigma'):
+    def __init__(self, test_case, name, resolution, coord_type='sigma'):
         """
         Create the step
 
@@ -23,10 +23,11 @@ class InitialState(Step):
         test_case : compass.ocean.tests.parabolic_bowl.default.Default
             The test case this step belongs to
         """
-        super().__init__(test_case=test_case, name='initial_state', ntasks=1,
-                         min_tasks=1, openmp_threads=1)
-
         self.coord_type = coord_type
+        self.resolution = resolution
+
+        super().__init__(test_case=test_case, name=name, ntasks=1,
+                         min_tasks=1, openmp_threads=1)
 
         self.add_namelist_file('compass.ocean.tests.parabolic_bowl',
                                'namelist.init', mode='init')
@@ -47,21 +48,35 @@ class InitialState(Step):
         config = self.config
         logger = self.logger
 
-        config = self.config
+        # Set vertical levels
         section = config['vertical_grid']
         coord_type = self.coord_type
         if coord_type == 'single_layer':
             options = {'config_parabolic_bowl_vert_levels': '1'}
-            self.update_namelist_at_runtime(options)
         else:
-            vert_levels = section.get('vert_levels')
+            vert_levels = config.getint('vertical_grid', 'vert_levels')
             options = {'config_parabolic_bowl_vert_levels': f'{vert_levels}'}
-            self.update_namelist_at_runtime(options)
+        self.update_namelist_at_runtime(options)
 
-        section = config['parabolic_bowl']
-        nx = section.getint('nx')
-        ny = section.getint('ny')
-        dc = section.getfloat('dc')
+        # Set test case parameters 
+        eta_max = config.getfloat('parabolic_bowl','eta_max')
+        depth_max = config.getfloat('parabolic_bowl','depth_max')
+        coriolis = config.getfloat('parabolic_bowl','coriolis_parameter')
+        omega = config.getfloat('parabolic_bowl','omega')
+        gravity = config.getfloat('parabolic_bowl','gravity')
+        options = {'config_parabolic_bowl_Coriolis_parameter': coriolis,
+                   'config_parabolic_bowl_eta0': eta_max,
+                   'config_parabolic_bowl_b0': depth_max,
+                   'config_parabolic_bowl_omega': omega,
+                   'config_parabolic_bowl_gravity': gravity}
+        self.update_namelist_at_runtime(options)
+
+        # Determine mesh parameters
+        Lx = config.getint('parabolic_bowl','Lx')
+        Ly = config.getint('parabolic_bowl','Ly')
+        nx = round(Lx / self.resolution)
+        ny = round(Ly / self.resolution)
+        dc = 1e3 * self.resolution
 
         logger.info(' * Make planar hex mesh')
         dsMesh = make_planar_hex_mesh(nx=nx, ny=ny, dc=dc, nonperiodic_x=True,

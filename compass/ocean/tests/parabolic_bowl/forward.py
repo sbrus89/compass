@@ -7,7 +7,7 @@ class Forward(Step):
     A step for performing forward MPAS-Ocean runs as part of parabolic bowl
     test cases.
     """
-    def __init__(self, test_case, resolution, name='forward', subdir=None,
+    def __init__(self, test_case, resolution, name,
                  coord_type='sigma'):
         """
         Create a new test case
@@ -30,14 +30,14 @@ class Forward(Step):
             vertical coordinate configuration
         """
 
-        super().__init__(test_case=test_case, name=name, subdir=subdir)
+        self.resolution = resolution
+
+        super().__init__(test_case=test_case, name=name)
 
         self.add_namelist_file('compass.ocean.tests.parabolic_bowl',
                                'namelist.forward')
-        if resolution < 1.:
-            res_name = f'{int(resolution*1e3)}m'
-        else:
-            res_name = f'{int(resolution)}km'
+
+        res_name = f'{resolution}km'
         self.add_namelist_file('compass.ocean.tests.parabolic_bowl',
                                f'namelist.{res_name}.forward')
         self.add_namelist_file('compass.ocean.tests.parabolic_bowl',
@@ -46,7 +46,7 @@ class Forward(Step):
         self.add_streams_file('compass.ocean.tests.parabolic_bowl',
                               'streams.forward')
 
-        input_path = '../initial_state'
+        input_path = f'../initial_state_{res_name}'
         self.add_input_file(filename='mesh.nc',
                             target=f'{input_path}/culled_mesh.nc')
 
@@ -83,6 +83,8 @@ class Forward(Step):
     def _get_resources(self):
         # get the these properties from the config options
         config = self.config
-        self.ntasks = config.getint('parabolic_bowl', 'forward_ntasks')
-        self.min_tasks = config.getint('parabolic_bowl', 'forward_min_tasks')
-        self.openmp_threads = config.getint('parabolic_bowl', 'forward_threads')
+        self.ntasks = config.getint('parabolic_bowl',
+                                    f'{self.resolution}km_ntasks')
+        self.min_tasks = config.getint('parabolic_bowl',
+                                       f'{self.resolution}km_min_tasks')
+        self.openmp_threads = 1
