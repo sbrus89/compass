@@ -39,8 +39,9 @@ class Viz(Step):
         Run this step of the test case
         """
 
-        points = [[0,0],[300,0],[610,0]]
-        points = np.asarray(points)
+        points = self.config.get('parabolic_bowl_viz', 'points')
+        points = points.replace('[','').replace(']','').split(',')
+        points = np.asarray(points, dtype=float).reshape(-1, 2)
         points = points*1000
 
         fig, ax = plt.subplots(nrows=len(points),ncols=1)
@@ -65,12 +66,15 @@ class Viz(Step):
             ax[i].plot(t,ssh_exact, label='exact')
 
         for i, pt in enumerate(points):
-            ax[i].legend()
             ax[i].set_xlabel('t')
             ax[i].set_ylabel('ssh')
             ax[i].set_title(f'Point ({pt[0]/1000}, {pt[1]/1000})')
-
-        fig.savefig(f'points.png', bbox_inches='tight')
+            if i == len(points)-1:
+              lines, lables = ax[i].get_legend_handles_labels()
+          
+        fig.tight_layout()
+        fig.legend(lines, lables, loc='lower center',ncol=4)
+        fig.savefig(f'points.png')#, bbox_inches='tight')
         
 
     def exact_solution(self, var, x, y, t):
