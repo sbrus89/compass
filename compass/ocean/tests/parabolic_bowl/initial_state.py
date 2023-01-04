@@ -59,11 +59,11 @@ class InitialState(Step):
         self.update_namelist_at_runtime(options)
 
         # Set test case parameters 
-        eta_max = config.getfloat('parabolic_bowl','eta_max')
-        depth_max = config.getfloat('parabolic_bowl','depth_max')
-        coriolis = config.getfloat('parabolic_bowl','coriolis_parameter')
-        omega = config.getfloat('parabolic_bowl','omega')
-        gravity = config.getfloat('parabolic_bowl','gravity')
+        eta_max = config.get('parabolic_bowl','eta_max')
+        depth_max = config.get('parabolic_bowl','depth_max')
+        coriolis = config.get('parabolic_bowl','coriolis_parameter')
+        omega = config.get('parabolic_bowl','omega')
+        gravity = config.get('parabolic_bowl','gravity')
         options = {'config_parabolic_bowl_Coriolis_parameter': coriolis,
                    'config_parabolic_bowl_eta0': eta_max,
                    'config_parabolic_bowl_b0': depth_max,
