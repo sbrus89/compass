@@ -14,7 +14,8 @@ class InitialState(Step):
     A step for creating a mesh and initial condition for drying slope test
     cases
     """
-    def __init__(self, test_case, name, resolution, coord_type='sigma'):
+    def __init__(self, test_case, name, resolution,
+                 coord_type='sigma', wetdry='standard'):
         """
         Create the step
 

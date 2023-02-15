@@ -8,7 +8,7 @@ class Forward(Step):
     test cases.
     """
     def __init__(self, test_case, resolution, name,
-                 coord_type='sigma'):
+                 coord_type='sigma', wetdry='standard'):
         """
         Create a new test case
 
@@ -42,9 +42,16 @@ class Forward(Step):
                                f'namelist.{res_name}.forward')
         self.add_namelist_file('compass.ocean.tests.parabolic_bowl',
                                f'namelist.{coord_type}.forward')
+        if wetdry == 'subgrid':
+            self.add_namelist_file('compass.ocean.tests.parabolic_bowl',
+                                   f'namelist.subgrid.forward')
 
-        self.add_streams_file('compass.ocean.tests.parabolic_bowl',
-                              'streams.forward')
+        if wetdry == 'subgrid':
+          self.add_streams_file('compass.ocean.tests.parabolic_bowl',
+                                'streams.subgrid.forward')
+        else:
+          self.add_streams_file('compass.ocean.tests.parabolic_bowl',
+                                'streams.forward')
 
         input_path = f'../initial_state_{res_name}'
         self.add_input_file(filename='mesh.nc',

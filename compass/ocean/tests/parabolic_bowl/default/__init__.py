@@ -15,7 +15,7 @@ class Default(TestCase):
         The type of vertical coordinate (``sigma``, ``single_layer``, etc.)
     """
 
-    def __init__(self, test_group, coord_type):
+    def __init__(self, test_group, coord_type, wetdry):
         """
         Create the test case
 
@@ -26,8 +26,12 @@ class Default(TestCase):
 
         coord_type : str
             The type of vertical coordinate (``sigma``, ``single_layer``)
+ 
+        wetdry : str
+            The type of wetting and drying used (``standard``, ``subgrid``)
         """
-        name = 'default'
+        #name = 'default'
+        name = wetdry
         self.coord_type = coord_type
 
         subdir = f'{coord_type}/{name}'
@@ -42,11 +46,13 @@ class Default(TestCase):
             self.add_step(InitialState(test_case=self,
                                        name=f'initial_state_{res_name}',
                                        resolution=resolution,
-                                       coord_type=coord_type))
+                                       coord_type=coord_type,
+                                       wetdry=wetdry))
             self.add_step(Forward(test_case=self,
                                   name=f'forward_{res_name}',
                                   resolution=resolution,
-                                  coord_type=coord_type))
+                                  coord_type=coord_type,
+                                  wetdry=wetdry))
         self.add_step(Viz(test_case=self, resolutions = resolutions))
  
 

@@ -1,5 +1,8 @@
-config_init_configuration='parabolic_bowl'
+config_init_configuration = 'parabolic_bowl'
 config_ocean_run_mode = 'init'
-config_use_wetting_drying=.true.
-config_drying_min_cell_height=1e-2
+config_use_wetting_drying = .true.
+config_drying_min_cell_height = 1e-2
 config_write_cull_cell_mask = .false.
+config_use_subgrid_wetting_drying = .true.  
+config_subgrid_table_levels_init = 100 
+config_parabolic_bowl_subgrid_level = 10
