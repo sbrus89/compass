@@ -39,6 +39,7 @@ class Viz(Step):
         Run this step of the test case
         """
 
+        # Pointwise timeseries plots 
         points = self.config.get('parabolic_bowl_viz', 'points')
         points = points.replace('[','').replace(']','').split(',')
         points = np.asarray(points, dtype=float).reshape(-1, 2)
@@ -59,23 +60,72 @@ class Viz(Step):
             for i, pt in enumerate(points):
 
                 ssh = interp(pt).T
-                ax[i].plot(t, ssh, label=f'{res}km')
+                ax[i].plot(t/86400, ssh, label=f'{res}km')
 
         for i, pt in enumerate(points):
             ssh_exact = self.exact_solution('zeta', pt[0], pt[1], t)
-            ax[i].plot(t,ssh_exact, label='exact')
+            ax[i].plot(t/86400,ssh_exact, label='exact')
 
         for i, pt in enumerate(points):
-            ax[i].set_xlabel('t')
-            ax[i].set_ylabel('ssh')
+            ax[i].set_xlabel('t (days)')
+            ax[i].set_ylabel('ssh (m)')
             ax[i].set_title(f'Point ({pt[0]/1000}, {pt[1]/1000})')
             if i == len(points)-1:
-              lines, lables = ax[i].get_legend_handles_labels()
+              lines, labels = ax[i].get_legend_handles_labels()
           
         fig.tight_layout()
-        fig.legend(lines, lables, loc='lower center',ncol=4)
+        fig.legend(lines, labels, loc='lower center',ncol=4)
         fig.savefig(f'points.png')#, bbox_inches='tight')
-        
+
+        # RMSE plots
+        comparisons = self.config.get('parabolic_bowl_viz', 'error_compare')
+        comparisons = comparisons.replace('[','').replace(']','').replace(' ','').split(',')
+        comparisons.insert(0,'.')
+        #comparisons.insert(0,self.test_case.name)
+        comparisons.insert(0,'subgrid_ramp')
+        comparisons = np.asarray(comparisons, dtype=object).reshape(-1, 2)
+
+        fig, ax = plt.subplots(nrows=1,ncols=1)
+
+        max_rmse = 0
+        for j, comp in enumerate(comparisons):
+            rmse = np.zeros(len(self.resolutions))
+            for i, res in enumerate(self.resolutions):
+
+                rmse[i] = self.compute_rmse(f'{comp[1]}/output_{res}km.nc')
+                if rmse[i] > max_rmse:
+                    max_rmse = rmse[i]
+
+            ax.loglog(self.resolutions, rmse, linestyle='-', marker='o', label=comp[0])
+
+
+        rmse_1st_order = np.zeros(len(self.resolutions))
+        rmse_1st_order[0] = max_rmse
+        for i in range(len(self.resolutions)-1):
+          rmse_1st_order[i+1] = rmse_1st_order[i]/2.0
+
+        ax.loglog(self.resolutions, np.flip(rmse_1st_order), linestyle='-', color='k', alpha=.25, label='1st order')
+
+        ax.set_xlabel('Cell size (km)')
+        ax.set_ylabel('RMSE (m)')
+           
+        ax.legend(loc='lower right') 
+        fig.tight_layout()
+        fig.savefig(f'error.png')
+
+    def compute_rmse(self, filename):
+
+        ds = xr.open_dataset(filename)
+
+        time = [dt.datetime.strptime(x.decode(),'%Y-%m-%d_%H:%M:%S') for x in ds.xtime.values]
+        ind = time.index(dt.datetime.strptime('0001-01-03_18:00:00', '%Y-%m-%d_%H:%M:%S'))
+
+        ssh = ds.ssh.values[ind,:]
+        t = (time[ind]-time[0]).total_seconds()
+        ssh_exact = self.exact_solution('zeta', ds.xCell.values, ds.yCell.values, t)
+        rmse = np.sqrt(np.mean(np.square(ssh-ssh_exact)))
+
+        return rmse
 
     def exact_solution(self, var, x, y, t):
 
@@ -87,8 +137,17 @@ class Viz(Step):
         omega = config.getfloat('parabolic_bowl', 'omega')
         g = config.getfloat('parabolic_bowl', 'gravity')
 
-        x = np.asarray(x)
-        y = np.asarray(y)
+        x = np.array(x)
+        y = np.array(y)
+        t = np.array(t)
+
+        x = np.atleast_1d(x)
+        y = np.atleast_1d(y)
+        t = np.atleast_1d(t)
+       
+        if t.size > 1:
+            x = np.resize(x, t.shape)
+            y = np.resize(y, t.shape)
 
 # paraminit.val = (paraminit.h0 + paraminit.zeta0)^2 ;
 # paraminit.CC = (paraminit.val - paraminit.h0^2.0)/(paraminit.val + paraminit.h0^2.0) ;
@@ -106,7 +165,7 @@ class Viz(Step):
 # bxy = param.h0*(1.0 - invL*r2) ;
 
         eps = 1.0e-12
-        r = np.sqrt(x*x + y*y)
+        r = np.sqrt(np.square(x) + np.square(y))
         L = np.sqrt(8.0*g*b0/(omega**2 - f**2))
         C = ((b0 + eta0)**2 - b0**2)/((b0 + eta0)**2 + b0**2)
         b = b0*(1.0 - r**2/L**2)
@@ -128,7 +187,7 @@ class Viz(Step):
 #             soln(idx) = -bxy(idx) ; 
 #         end 
             soln = b0*(den*np.sqrt(num) - 1.0 - (r**2/L**2)*(den**2*num - 1.0))
-            soln[h<eps] = -b
+            soln[h<eps] = -b[h<eps]
 
         elif var == 'u':
 #         soln = 0.5*den*( omeg0*xx*CC*sin(omeg0*t) - ff*yy*(sqrt(num) ... 
