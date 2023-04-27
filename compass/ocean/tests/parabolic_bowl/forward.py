@@ -44,14 +44,14 @@ class Forward(Step):
                                f'namelist.{coord_type}.forward')
         if wetdry == 'subgrid':
             self.add_namelist_file('compass.ocean.tests.parabolic_bowl',
-                                   f'namelist.subgrid.forward')
+                                   'namelist.subgrid.forward')
 
         if wetdry == 'subgrid':
-          self.add_streams_file('compass.ocean.tests.parabolic_bowl',
-                                'streams.subgrid.forward')
+            self.add_streams_file('compass.ocean.tests.parabolic_bowl',
+                                  'streams.subgrid.forward')
         else:
-          self.add_streams_file('compass.ocean.tests.parabolic_bowl',
-                                'streams.forward')
+            self.add_streams_file('compass.ocean.tests.parabolic_bowl',
+                                  'streams.forward')
 
         input_path = f'../initial_state_{res_name}'
         self.add_input_file(filename='mesh.nc',
@@ -65,7 +65,7 @@ class Forward(Step):
 
         self.add_model_as_input()
 
-        #self.add_output_file(filename='output.nc')
+        # self.add_output_file(filename='output.nc')
 
     def setup(self):
         """
