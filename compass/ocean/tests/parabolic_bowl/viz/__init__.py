@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import datetime as dt
 import subprocess
 from scipy.interpolate import LinearNDInterpolator
+import netCDF4
 
 from compass.step import Step
 
@@ -73,17 +74,39 @@ class Viz(Step):
             if i == len(points)-1:
               lines, labels = ax[i].get_legend_handles_labels()
           
+        fig.legend(lines, labels, loc='lower center',ncol=4, bbox_to_anchor=(0.5,-0.2))
         fig.tight_layout()
-        fig.legend(lines, labels, loc='lower center',ncol=4)
         fig.savefig(f'points.png')#, bbox_inches='tight')
+
+        # Inject exact solution
+        for res in self.resolutions:
+            ds = xr.open_dataset(f'output_{res}km.nc')
+
+            if 'ssh_exact' not in ds:
+                time = [dt.datetime.strptime(x.decode(),'%Y-%m-%d_%H:%M:%S') for x in ds.xtime.values]
+                ssh_exact = ds.ssh.copy(deep=True)
+                for i,tstep in enumerate(time):
+                    t = (time[i]-time[0]).total_seconds()
+
+                    ssh_exact[i,:] = self.exact_solution('zeta', ds.xCell.values, ds.yCell.values, t)
+                ds['ssh_exact'] = ssh_exact
+                ds.ssh_exact.encoding['_FillValue']=None
+                ds.to_netcdf(f'output_{res}km.nc',format="NETCDF3_64BIT_OFFSET",mode='a')
+            ds.close()
 
         # RMSE plots
         comparisons = self.config.get('parabolic_bowl_viz', 'error_compare')
         comparisons = comparisons.replace('[','').replace(']','').replace(' ','').split(',')
+        #comparisons = []
         comparisons.insert(0,'.')
         #comparisons.insert(0,self.test_case.name)
         comparisons.insert(0,'subgrid_ramp')
-        comparisons = np.asarray(comparisons, dtype=object).reshape(-1, 2)
+        comparisons = np.asarray(comparisons, dtype=object)
+        print(comparisons.shape)
+        if len(comparisons.shape) == 1:
+          comparisons = np.expand_dims(comparisons, axis=0)
+        print(comparisons.shape)
+        comparisons = comparisons.reshape(-1, 2)
 
         fig, ax = plt.subplots(nrows=1,ncols=1)
 
@@ -149,21 +172,6 @@ class Viz(Step):
             x = np.resize(x, t.shape)
             y = np.resize(y, t.shape)
 
-# paraminit.val = (paraminit.h0 + paraminit.zeta0)^2 ;
-# paraminit.CC = (paraminit.val - paraminit.h0^2.0)/(paraminit.val + paraminit.h0^2.0) ;
-# paraminit.Lb =  sqrt(8.0*paraminit.gg*paraminit.h0/ ... 
-#    (paraminit.omeg0*paraminit.omeg0 - paraminit.ff*paraminit.ff)) ;
-# L2 = Lb*Lb ;
-# r2 = xx.*xx + yy.*yy ;
-# num = 1 - CC*CC ;
-# den = 1.0/(1.0 - CC*cos(omeg0*t)) ;
-# hh0 = h0*( den*sqrt(num) - den*den*(r2/L2)*num ) ; 
-# hh0( hh0 < eps_dry ) = 0 ; 
-
-# invL = (1.0)/(param.Lb*param.Lb) ;
-# r2 = x.*x + y.*y ;
-# bxy = param.h0*(1.0 - invL*r2) ;
-
         eps = 1.0e-12
         r = np.sqrt(np.square(x) + np.square(y))
         L = np.sqrt(8.0*g*b0/(omega**2 - f**2))
@@ -175,38 +183,21 @@ class Viz(Step):
         h[h<eps] = 0.0 
 
         if var == 'h':
-#         soln = hh0 ;
             soln = h
 
         elif var == 'zeta':
-#         soln = h0*( den*sqrt(num) - ... 
-#             1.0 - (r2/L2)*(den*den*num - 1.0) ) ; 
-#     
-#         idx = find( hh0 < eps_dry ) ; 
-#         if ( ~isempty(idx) )
-#             soln(idx) = -bxy(idx) ; 
-#         end 
             soln = b0*(den*np.sqrt(num) - 1.0 - (r**2/L**2)*(den**2*num - 1.0))
             soln[h<eps] = -b[h<eps]
 
         elif var == 'u':
-#         soln = 0.5*den*( omeg0*xx*CC*sin(omeg0*t) - ff*yy*(sqrt(num) ... 
-#             + CC*cos(omeg0*t) - 1.0) ) ; 
-#     
-#         soln( hh0 < eps_dry ) = 0 ; 
             soln = 0.5*den*(omega*x*C*np.sin(omega*t) - f*y*(np.sqrt(num) + C*np.cos(omega*t) - 1.0))
             soln[h<eps] = 0
 
         elif var == 'v':
-#         soln = 0.5*den*( omeg0*yy*CC*sin(omeg0*t) + ff*xx*(sqrt(num) ... 
-#             + CC*cos(omeg0*t) - 1.0) ) ; 
-#     
-#         soln( hh0 < eps_dry ) = 0 ; 
             soln = 0.5*den*(omega*y*C*np.sin(omega*t) + f*x*(np.sqrt(num) + C*np.cos(omega*t) - 1.0))
             soln[h<eps] = 0
 
         elif var == 'r':
-#         soln = Lb*sqrt( (1 - CC*cos( omeg0*t))/sqrt(1 - CC*CC) ) ; 
             soln = L*np.sqrt((1.0 - C*np.cos(omega*t))/np.sqrt(1.0 - C**2))
 
         else:
