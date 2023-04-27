@@ -1,7 +1,7 @@
-from compass.testcase import TestCase
-from compass.ocean.tests.parabolic_bowl.initial_state import InitialState
 from compass.ocean.tests.parabolic_bowl.forward import Forward
+from compass.ocean.tests.parabolic_bowl.initial_state import InitialState
 from compass.ocean.tests.parabolic_bowl.viz import Viz
+from compass.testcase import TestCase
 from compass.validate import compare_variables
 
 
@@ -26,11 +26,10 @@ class Default(TestCase):
 
         coord_type : str
             The type of vertical coordinate (``sigma``, ``single_layer``)
- 
+
         wetdry : str
             The type of wetting and drying used (``standard``, ``subgrid``)
         """
-        #name = 'default'
         name = wetdry
         self.coord_type = coord_type
 
@@ -39,7 +38,7 @@ class Default(TestCase):
                          subdir=subdir)
 
         resolutions = [5, 10, 20]
-        for resolution in resolutions: 
+        for resolution in resolutions:
 
             res_name = f'{resolution}km'
 
@@ -53,20 +52,12 @@ class Default(TestCase):
                                   resolution=resolution,
                                   coord_type=coord_type,
                                   wetdry=wetdry))
-        self.add_step(Viz(test_case=self, resolutions = resolutions))
- 
+        self.add_step(Viz(test_case=self, resolutions=resolutions))
 
-    def configure(self):
+    def validate(self):
         """
-        Modify the configuration options for this test case.
+        Validate variables against a baseline
         """
-
-        config = self.config
-
-#    def validate(self):
-#        """
-#        Validate variables against a baseline
-#        """
-#        variables = ['layerThickness', 'normalVelocity']
-#        compare_variables(test_case=self, variables=variables,
-#                          filename1='forward/output.nc')
+        variables = ['layerThickness', 'normalVelocity']
+        compare_variables(test_case=self, variables=variables,
+                          filename1='forward/output.nc')

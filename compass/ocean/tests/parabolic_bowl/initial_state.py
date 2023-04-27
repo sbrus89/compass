@@ -1,12 +1,9 @@
-import xarray
-import numpy
-
-from mpas_tools.planar_hex import make_planar_hex_mesh
 from mpas_tools.io import write_netcdf
 from mpas_tools.mesh.conversion import convert, cull
+from mpas_tools.planar_hex import make_planar_hex_mesh
 
-from compass.step import Step
 from compass.model import run_model
+from compass.step import Step
 
 
 class InitialState(Step):
@@ -50,7 +47,6 @@ class InitialState(Step):
         logger = self.logger
 
         # Set vertical levels
-        section = config['vertical_grid']
         coord_type = self.coord_type
         if coord_type == 'single_layer':
             options = {'config_parabolic_bowl_vert_levels': '1'}
@@ -59,12 +55,12 @@ class InitialState(Step):
             options = {'config_parabolic_bowl_vert_levels': f'{vert_levels}'}
         self.update_namelist_at_runtime(options)
 
-        # Set test case parameters 
-        eta_max = config.get('parabolic_bowl','eta_max')
-        depth_max = config.get('parabolic_bowl','depth_max')
-        coriolis = config.get('parabolic_bowl','coriolis_parameter')
-        omega = config.get('parabolic_bowl','omega')
-        gravity = config.get('parabolic_bowl','gravity')
+        # Set test case parameters
+        eta_max = config.get('parabolic_bowl', 'eta_max')
+        depth_max = config.get('parabolic_bowl', 'depth_max')
+        coriolis = config.get('parabolic_bowl', 'coriolis_parameter')
+        omega = config.get('parabolic_bowl', 'omega')
+        gravity = config.get('parabolic_bowl', 'gravity')
         options = {'config_parabolic_bowl_Coriolis_parameter': coriolis,
                    'config_parabolic_bowl_eta0': eta_max,
                    'config_parabolic_bowl_b0': depth_max,
@@ -73,8 +69,8 @@ class InitialState(Step):
         self.update_namelist_at_runtime(options)
 
         # Determine mesh parameters
-        Lx = config.getint('parabolic_bowl','Lx')
-        Ly = config.getint('parabolic_bowl','Ly')
+        Lx = config.getint('parabolic_bowl', 'Lx')
+        Ly = config.getint('parabolic_bowl', 'Ly')
         nx = round(Lx / self.resolution)
         ny = round(Ly / self.resolution)
         dc = 1e3 * self.resolution
