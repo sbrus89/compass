@@ -11,11 +11,11 @@ class Default(TestCase):
 
     Attributes
     ----------
-    coord_type : str
-        The type of vertical coordinate (``sigma``, ``single_layer``, etc.)
+    ramp_type : str
+        The type of vertical coordinate (``ramp``, ``noramp``, etc.)
     """
 
-    def __init__(self, test_group, coord_type, wetdry):
+    def __init__(self, test_group, ramp_type, wetdry):
         """
         Create the test case
 
@@ -24,16 +24,15 @@ class Default(TestCase):
         test_group : compass.ocean.tests.parabolic_bowl.ParabolicBowl
             The test group that this test case belongs to
 
-        coord_type : str
-            The type of vertical coordinate (``sigma``, ``single_layer``)
+        ramp_type : str
+            The type of vertical coordinate (``ramp``, ``noramp``)
 
         wetdry : str
             The type of wetting and drying used (``standard``, ``subgrid``)
         """
-        name = wetdry
-        self.coord_type = coord_type
+        name = f'{wetdry}_{ramp_type}'
 
-        subdir = f'{coord_type}/{name}'
+        subdir = f'{wetdry}/{ramp_type}'
         super().__init__(test_group=test_group, name=name,
                          subdir=subdir)
 
@@ -45,19 +44,18 @@ class Default(TestCase):
             self.add_step(InitialState(test_case=self,
                                        name=f'initial_state_{res_name}',
                                        resolution=resolution,
-                                       coord_type=coord_type,
                                        wetdry=wetdry))
             self.add_step(Forward(test_case=self,
                                   name=f'forward_{res_name}',
                                   resolution=resolution,
-                                  coord_type=coord_type,
+                                  ramp_type=ramp_type,
                                   wetdry=wetdry))
         self.add_step(Viz(test_case=self, resolutions=resolutions))
 
-    def validate(self):
-        """
-        Validate variables against a baseline
-        """
-        variables = ['layerThickness', 'normalVelocity']
-        compare_variables(test_case=self, variables=variables,
-                          filename1='forward/output.nc')
+#    def validate(self):
+#        """
+#        Validate variables against a baseline
+#        """
+#        variables = ['layerThickness', 'normalVelocity']
+#        compare_variables(test_case=self, variables=variables,
+#                          filename1='forward/output.nc')

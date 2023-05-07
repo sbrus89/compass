@@ -101,9 +101,9 @@ class Viz(Step):
 
         # RMSE plots
         comparisons = self.config.get('parabolic_bowl_viz', 'error_compare')
-        comparisons = comparisons.replace('[', '').replace(']', '')
-        comparisons = comparisons.replace(' ', '').split(',')
-        # comparisons = []
+        if comparisons.replace(' ', '') != '[]':
+            comparisons = comparisons.replace('[', '').replace(']', '')
+            comparisons = comparisons.replace(' ', '').split(',')
         comparisons.insert(0, '.')
         # comparisons.insert(0,self.test_case.name)
         comparisons.insert(0, 'subgrid_ramp')

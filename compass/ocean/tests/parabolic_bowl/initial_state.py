@@ -12,7 +12,7 @@ class InitialState(Step):
     cases
     """
     def __init__(self, test_case, name, resolution,
-                 coord_type='sigma', wetdry='standard'):
+                 coord_type='single_layer', wetdry='standard'):
         """
         Create the step
 

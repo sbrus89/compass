@@ -8,7 +8,8 @@ class Forward(Step):
     test cases.
     """
     def __init__(self, test_case, resolution, name,
-                 coord_type='sigma', wetdry='standard'):
+                 ramp_type='ramp', coord_type='single_layer',
+                 wetdry='standard'):
         """
         Create a new test case
 
@@ -28,6 +29,9 @@ class Forward(Step):
 
         coord_type : str, optional
             vertical coordinate configuration
+
+        ramp_type : str, optional
+            vertical coordinate configuration
         """
 
         self.resolution = resolution
@@ -42,9 +46,13 @@ class Forward(Step):
                                f'namelist.{res_name}.forward')
         self.add_namelist_file('compass.ocean.tests.parabolic_bowl',
                                f'namelist.{coord_type}.forward')
+
         if wetdry == 'subgrid':
             self.add_namelist_file('compass.ocean.tests.parabolic_bowl',
                                    'namelist.subgrid.forward')
+        if ramp_type == 'ramp':
+            self.add_namelist_file('compass.ocean.tests.parabolic_bowl',
+                                   'namelist.ramp.forward')
 
         if wetdry == 'subgrid':
             self.add_streams_file('compass.ocean.tests.parabolic_bowl',
@@ -65,7 +73,7 @@ class Forward(Step):
 
         self.add_model_as_input()
 
-        # self.add_output_file(filename='output.nc')
+        self.add_output_file(filename='output.nc')
 
     def setup(self):
         """

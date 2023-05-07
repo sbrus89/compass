@@ -14,7 +14,7 @@ class ParabolicBowl(TestGroup):
         """
         super().__init__(mpas_core=mpas_core, name='parabolic_bowl')
         for wetdry in ['standard', 'subgrid']:
-            for coord_type in ['sigma', 'single_layer']:
+            for ramp_type in ['ramp', 'noramp']:
                 self.add_test_case(
-                    Default(test_group=self, coord_type=coord_type,
+                    Default(test_group=self, ramp_type=ramp_type,
                             wetdry=wetdry))
