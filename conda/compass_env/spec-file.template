@@ -38,6 +38,7 @@ ruamel.yaml
 # having pip check problems with this version
 scikit-image !=0.20.0
 scipy>=1.8.0
+scikit-optimize
 shapely>=2.0,<3.0
 xarray
 
