@@ -1,4 +1,5 @@
-import numpy as np
+from skopt.sampler import Grid
+from skopt.space import Space
 
 from compass.ocean.tests.soma.analysis import Analysis
 from compass.ocean.tests.soma.forward import Forward
@@ -96,13 +97,47 @@ class SomaEnsemble(TestCase):
             with_surface_restoring=with_surface_restoring,
             three_layer=three_layer))
 
+        space = Space([(200.0, 2000.0, "uniform"),      # GM_constant_kappa
+                       (0.0, 3000.0, "uniform"),        # Redi_constant_kappa
+                       (0.0, 1e-4, "uniform"),          # cvmix_background_diff
+                       (1e-4, 1e-2, "uniform"),         # implicit_bottom_drag
+                       (0.04, 0.08, "uniform"),         # submesoscale_Ce
+                       (200.0, 5000.0, "uniform"),      # submesoscale_Lfmin
+                       (86400.0, 864000.0, "uniform"),  # submesoscale_tau
+                       ])
+        n_samples = 50
+
+        grid = Grid(border="include", use_full_layout=False)
+        x = grid.generate(space.dimensions, n_samples)
+
         option_list = []
-        for gm in np.linspace(200, 2000, 5):
-            for redi in np.linspace(0, 3000, 5):
-                options = {}
-                options['config_GM_constant_kappa'] = str(gm)
-                options['config_Redi_constant_kappa'] = str(redi)
-                option_list.append(options)
+        option_list.append({})
+        for opt in x:
+            options = {}
+            options['config_GM_constant_kappa'] = str(opt[0])
+            options['config_Redi_constant_kappa'] = str(opt[1])
+            options['config_cvmix_background_diffusion'] = str(opt[2])
+            options['config_implicit_bottom_drag_coeff'] = str(opt[3])
+            options['config_submesoscale_Ce'] = str(opt[4])
+            options['config_submesoscale_Lfmin'] = str(opt[5])
+            options['config_submesoscale_tau'] = str(opt[6])
+            options['config_use_GM'] = '.true.'
+            options['config_use_Redi'] = '.true.'
+            options['config_submesoscale_enable'] = '.true.'
+            option_list.append(options)
+
+        options = {}
+        options['config_GM_constant_kappa'] = '900.0'
+        options['config_Redi_constant_kappa'] = '400.0'
+        options['config_cvmix_background_diffusion'] = '0.0'
+        options['config_implicit_bottom_drag_coeff'] = '1e-3'
+        options['config_submesoscale_Ce'] = '0.06'
+        options['config_submesoscale_Lfmin'] = '1000.0'
+        options['config_submesoscale_tau'] = '172800.0'
+        options['config_use_GM'] = '.true.'
+        options['config_use_Redi'] = '.true.'
+        options['config_submesoscale_enable'] = '.true.'
+        option_list.append(options)
 
         for i, options in enumerate(option_list):
             self.add_step(Forward(
