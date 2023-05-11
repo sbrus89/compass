@@ -33,6 +33,7 @@ pyproj
 pyremap>=0.0.13,<0.1.0
 requests
 scipy>=1.8.0
+scikit-optimize
 shapely>=2.0,<3.0
 xarray
 
