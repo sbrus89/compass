@@ -428,8 +428,8 @@ def _get_basic_config(config_file, machine, mpas_model_path, mpas_core):
     config.add_from_package('compass', 'default.cfg')
 
     # add the E3SM config options from mache
-    if machine is not None:
-        config.add_from_package('mache.machines', f'{machine}.cfg')
+    # if machine is not None:
+    #    config.add_from_package('mache.machines', f'{machine}.cfg')
 
     # add the compass machine config file
     if machine is None:
