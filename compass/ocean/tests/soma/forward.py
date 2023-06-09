@@ -107,7 +107,7 @@ class Forward(Step):
         if long:
             # run for 3 years instead of 3 time steps
             options['config_start_time'] = "'0001-01-01_00:00:00'"
-            options['config_stop_time'] = "'0002-01-01_00:00:00'"
+            options['config_stop_time'] = "'0004-01-01_00:00:00'"
             options['config_run_duration'] = "'none'"
 
         if three_layer:
