@@ -74,43 +74,49 @@ class Viz(Step):
             if i == len(points) - 1:
                 lines, labels = ax[i].get_legend_handles_labels()
 
-        fig.legend(lines, labels,
-                   loc='lower center', ncol=4,
-                   bbox_to_anchor=(0.5, -0.2))
         fig.tight_layout()
+        fig.subplots_adjust(bottom=0.2)
+        fig.legend(lines, labels,
+                   loc='lower center', ncol=4)
         fig.savefig('points.png')
 
         # Inject exact solution
         for res in self.resolutions:
             ds = xr.open_dataset(f'output_{res}km.nc')
 
-            if 'ssh_exact' not in ds:
+            if 'ssh_exact' and 'layerThickness_exact' not in ds:
                 time = [dt.datetime.strptime(x.decode(), '%Y-%m-%d_%H:%M:%S')
                         for x in ds.xtime.values]
                 ssh_exact = ds.ssh.copy(deep=True)
+                layerThickness_exact = ds.layerThickness.copy(deep=True)
                 for i, tstep in enumerate(time):
                     t = (time[i] - time[0]).total_seconds()
 
                     ssh_exact[i, :] = self.exact_solution(
                         'zeta', ds.xCell.values, ds.yCell.values, t)
+                    layerThickness_exact[i, :, 0] = self.exact_solution(
+                        'h', ds.xCell.values, ds.yCell.values, t)
                 ds['ssh_exact'] = ssh_exact
+                ds['layerThickness_exact'] = layerThickness_exact
                 ds.ssh_exact.encoding['_FillValue'] = None
+                ds.layerThickness_exact.encoding['_FillValue'] = None
                 ds.to_netcdf(f'output_{res}km.nc',
                              format="NETCDF3_64BIT_OFFSET", mode='a')
             ds.close()
 
         # RMSE plots
-        comparisons = self.config.get('parabolic_bowl_viz', 'error_compare')
-        if comparisons.replace(' ', '') != '[]':
-            comparisons = comparisons.replace('[', '').replace(']', '')
-            comparisons = comparisons.replace(' ', '').split(',')
-        comparisons.insert(0, '.')
-        # comparisons.insert(0,self.test_case.name)
-        comparisons.insert(0, 'subgrid_ramp')
-        comparisons = np.asarray(comparisons, dtype=object)
-        if len(comparisons.shape) == 1:
-            comparisons = np.expand_dims(comparisons, axis=0)
-        comparisons = comparisons.reshape(-1, 2)
+        comparisons = []
+        cases = {'subgrid_ramp': '../../../subgrid/ramp/viz',
+                 'subgrid_noramp': '../../../subgrid/noramp/viz',
+                 'standard_ramp': '../../../standard/ramp/viz',
+                 'standard_noramp': '../../../standard/noramp/viz'}
+        for case in cases:
+            include = True
+            for res in self.resolutions:
+                if not os.path.exists(f'{cases[case]}/output_{res}km.nc'):
+                    include = False
+            if include:
+                comparisons.append(case)
 
         fig, ax = plt.subplots(nrows=1, ncols=1)
 
@@ -119,12 +125,18 @@ class Viz(Step):
             rmse = np.zeros(len(self.resolutions))
             for i, res in enumerate(self.resolutions):
 
-                rmse[i] = self.compute_rmse(f'{comp[1]}/output_{res}km.nc')
+                # rmse[i] = self.compute_rmse(
+                #     'zeta',
+                #     f'{cases[comp]}/output_{res}km.nc')
+                rmse[i] = self.compute_rmse(
+                    'h',
+                    f'{cases[comp]}/output_{res}km.nc')
+
                 if rmse[i] > max_rmse:
                     max_rmse = rmse[i]
 
             ax.loglog(self.resolutions, rmse,
-                      linestyle='-', marker='o', label=comp[0])
+                      linestyle='-', marker='o', label=comp)
 
         rmse_1st_order = np.zeros(len(self.resolutions))
         rmse_1st_order[0] = max_rmse
@@ -141,7 +153,7 @@ class Viz(Step):
         fig.tight_layout()
         fig.savefig('error.png')
 
-    def compute_rmse(self, filename):
+    def compute_rmse(self, varname, filename):
 
         ds = xr.open_dataset(filename)
 
@@ -149,12 +161,15 @@ class Viz(Step):
                 for x in ds.xtime.values]
         ind = time.index(dt.datetime.strptime('0001-01-03_18:00:00',
                                               '%Y-%m-%d_%H:%M:%S'))
+        if varname == 'zeta':
+            var = ds['ssh'].values[ind, :]
+        elif varname == 'h':
+            var = ds['layerThickness'].values[ind, :, 0]
 
-        ssh = ds.ssh.values[ind, :]
         t = (time[ind] - time[0]).total_seconds()
-        ssh_exact = self.exact_solution('zeta', ds.xCell.values,
+        var_exact = self.exact_solution(varname, ds.xCell.values,
                                         ds.yCell.values, t)
-        rmse = np.sqrt(np.mean(np.square(ssh - ssh_exact)))
+        rmse = np.sqrt(np.mean(np.square(var - var_exact)))
 
         return rmse
 
