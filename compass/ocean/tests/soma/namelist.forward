@@ -18,3 +18,4 @@ config_pio_num_iotasks = 1
 config_pio_stride = 4
 config_write_output_on_startup = .false.
 config_Redi_use_quasi_monotone_limiter = .true.
+config_AM_timeSeriesStatsMonthly_enable = .true.

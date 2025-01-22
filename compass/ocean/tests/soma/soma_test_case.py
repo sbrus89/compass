@@ -1,8 +1,9 @@
-from compass.testcase import TestCase
-from compass.ocean.tests.soma.initial_state import InitialState
-from compass.ocean.tests.soma.forward import Forward
 from compass.ocean.tests.soma.analysis import Analysis
-from compass.validate import compare_variables, compare_timers
+from compass.ocean.tests.soma.forward import Forward
+from compass.ocean.tests.soma.initial_state import InitialState
+from compass.ocean.tests.soma.moc import Moc
+from compass.testcase import TestCase
+from compass.validate import compare_timers, compare_variables
 
 
 class SomaTestCase(TestCase):
@@ -105,6 +106,8 @@ class SomaTestCase(TestCase):
 
         if with_particles:
             self.add_step(Analysis(test_case=self, resolution=resolution))
+
+        self.add_step(Moc(test_case=self, resolution=resolution))
 
     def configure(self):
         """
