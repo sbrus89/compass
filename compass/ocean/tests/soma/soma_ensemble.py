@@ -1,5 +1,5 @@
-# from skopt.sampler import Grid
-# from skopt.space import Space
+from skopt.sampler import Grid
+from skopt.space import Space
 
 from compass.ocean.tests.soma.analysis import Analysis
 from compass.ocean.tests.soma.forward import Forward
@@ -105,45 +105,109 @@ class SomaEnsemble(TestCase):
         #              (200.0, 5000.0, "uniform"),      # submesoscale_Lfmin
         #              (86400.0, 864000.0, "uniform"),  # submesoscale_tau
         #              ])
-        # n_samples = 1000
+        n_samples = 1000
+        #space = Space([(200.0, 2000.0, "uniform")])         # GM_constant_kappa
+        space = Space([(0.0, 1e-4, "uniform")])         # Redi_constant_kappa
+        space = Space([(0.0, 3000.0, "uniform")])         # cvmix_background_diff
 
-        # grid = Grid(border="include", use_full_layout=False)
-        # x = grid.generate(space.dimensions, n_samples)
-        from scipy.stats import qmc
-        sampler = qmc.LatinHypercube(d=7)
-        sample = sampler.random(n=1000)
-        l_bounds = [200.0, 0.0, 0.0, 1e-4, 0.04, 200.0, 86400.0]
-        u_bounds = [2000.0, 3000.0, 1e-4, 1e-2, 0.08, 5000.0, 864000.0]
-        scaled_sample = qmc.scale(sample, l_bounds, u_bounds)
+        grid = Grid(border="include", use_full_layout=False)
+        x = grid.generate(space.dimensions, n_samples)[:100]
+
+        #from scipy.stats import qmc
+        #sampler = qmc.LatinHypercube(d=7)
+        #sample = sampler.random(n=100)
+        #l_bounds = [200.0, 0.0, 0.0, 1e-4, 0.04, 200.0, 86400.0]
+        #u_bounds = [2000.0, 3000.0, 1e-4, 1e-2, 0.08, 5000.0, 864000.0]
+        #scaled_sample = qmc.scale(sample, l_bounds, u_bounds)
 
         option_list = []
-        option_list.append({})
-        for opt in scaled_sample:
+        options = {}
+        options['config_GM_closure'] = "'constant'"
+        options['config_Redi_closure'] = "'constant'"
+        option_list.append(options)
+        '''
+        for opt in x:
             options = {}
-            options['config_GM_constant_kappa'] = str(opt[0])
-            options['config_Redi_constant_kappa'] = str(opt[1])
-            options['config_cvmix_background_diffusion'] = str(opt[2])
-            options['config_implicit_bottom_drag_coeff'] = str(opt[3])
-            options['config_submesoscale_Ce'] = str(opt[4])
-            options['config_submesoscale_Lfmin'] = str(opt[5])
-            options['config_submesoscale_tau'] = str(opt[6])
+            options['config_GM_constant_kappa'] = '600.0'
+            #options['config_GM_constant_kappa'] = str(opt[0])
+            options['config_Redi_constant_kappa'] = '400.0'
+            #options['config_Redi_constant_kappa'] = str(opt[0])
+            #options['config_cvmix_background_diffusion'] = '0.0'
+            options['config_cvmix_background_diffusion'] = str(opt[0])
+            options['config_implicit_constant_bottom_drag_coeff'] = '0.001'
+            options['config_submesoscale_Ce'] = '0.06'
+            options['config_submesoscale_Lfmin'] = '1000.0'
+            options['config_submesoscale_tau'] = '172800.0'
+            options['config_GM_closure'] = "'constant'"
+            options['config_Redi_closure'] = "'constant'"
             options['config_use_GM'] = '.true.'
             options['config_use_Redi'] = '.true.'
             options['config_submesoscale_enable'] = '.true.'
             option_list.append(options)
+        '''
+        #for opt in scaled_sample:
+        #    options = {}
+        #    options['config_GM_constant_kappa'] = str(opt[0])
+        #    options['config_Redi_constant_kappa'] = str(opt[1])
+        #    options['config_cvmix_background_diffusion'] = str(opt[2])
+        #    options['config_implicit_constant_bottom_drag_coeff'] = str(opt[3])
+        #    options['config_submesoscale_Ce'] = str(opt[4])
+        #    options['config_submesoscale_Lfmin'] = str(opt[5])
+        #    options['config_submesoscale_tau'] = str(opt[6])
+        #    options['config_GM_closure'] = "'constant'"
+        #    options['config_Redi_closure'] = "'constant'"
+        #    options['config_use_GM'] = '.true.'
+        #    options['config_use_Redi'] = '.true.'
+        #    options['config_submesoscale_enable'] = '.true.'
+        #    option_list.append(options)
 
-        options = {}
-        options['config_GM_constant_kappa'] = '900.0'
-        options['config_Redi_constant_kappa'] = '400.0'
-        options['config_cvmix_background_diffusion'] = '0.0'
-        options['config_implicit_bottom_drag_coeff'] = '1e-3'
-        options['config_submesoscale_Ce'] = '0.06'
-        options['config_submesoscale_Lfmin'] = '1000.0'
-        options['config_submesoscale_tau'] = '172800.0'
-        options['config_use_GM'] = '.true.'
-        options['config_use_Redi'] = '.true.'
-        options['config_submesoscale_enable'] = '.true.'
-        option_list.append(options)
+        #fdx = [1642.2360248447205, 587.5776397515529, 258.06451612903226, 464.59627329192546, 1944.0993788819876
+        #            ,1567.7018633540374, 1284.472049689441, 527.9503105590062, 945.3416149068323, 736.6459627329193]
+        #fdx = [464.59627329192546] #GM
+        #fdx = [400] #Redi
+        #fdx = [0.00005] #cvmix
+        fdx = [0.001] #bottom drag
+        #deltas = [-0.000005,-0.000004,-0.000003,-0.000002,-0.000001,
+        #           0.000001,0.000002,0.000003,0.000004,0.000005]
+        deltas = [-0.0001,-0.00008,-0.00006,-0.00004,-0.00002,
+                   0.00002,0.00004,0.00006,0.00008,0.0001]
+
+        for opt in fdx:
+            for d in deltas:
+                options = {}
+                #options['config_GM_constant_kappa'] = str(opt+1)
+                #options['config_GM_constant_kappa'] = str(opt+0.1)
+                options['config_GM_constant_kappa'] = '600.0'
+                options['config_Redi_constant_kappa'] = '400.0'
+                #options['config_Redi_constant_kappa'] = str(opt+d)
+                options['config_cvmix_background_diffusion'] = '0.0'
+                #options['config_cvmix_background_diffusion'] = str(opt+d)
+                #options['config_implicit_constant_bottom_drag_coeff'] = '0.001'
+                options['config_implicit_constant_bottom_drag_coeff'] = str(opt+d)
+                options['config_submesoscale_Ce'] = '0.06'
+                options['config_submesoscale_Lfmin'] = '1000.0'
+                options['config_submesoscale_tau'] = '172800.0'
+                options['config_use_GM'] = '.true.'
+                options['config_use_Redi'] = '.true.'
+                options['config_GM_closure'] = "'constant'"
+                options['config_Redi_closure'] = "'constant'"
+                options['config_submesoscale_enable'] = '.true.'
+                option_list.append(options)
+
+        #options = {}
+        #options['config_GM_constant_kappa'] = '1202.0'
+        #options['config_Redi_constant_kappa'] = '400.0'
+        #options['config_cvmix_background_diffusion'] = '0.0'
+        #options['config_implicit_constant_bottom_drag_coeff'] = '0.0009'
+        #options['config_submesoscale_Ce'] = '0.06'
+        #options['config_submesoscale_Lfmin'] = '1000.0'
+        #options['config_submesoscale_tau'] = '172800.0'
+        #options['config_use_GM'] = '.true.'
+        #options['config_use_Redi'] = '.true.'
+        #options['config_GM_closure'] = "'constant'"
+        #options['config_Redi_closure'] = "'constant'"
+        #options['config_submesoscale_enable'] = '.true.'
+        #option_list.append(options)
 
         for i, options in enumerate(option_list):
             self.add_step(Forward(
