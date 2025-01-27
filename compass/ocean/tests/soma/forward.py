@@ -1,8 +1,8 @@
 import numpy as np
 
-from compass.step import Step
 from compass.model import partition, run_model
 from compass.ocean.particles import build_particle_simple
+from compass.step import Step
 
 
 class Forward(Step):
@@ -18,7 +18,8 @@ class Forward(Step):
         Whether to run with Lagrangian particles
     """
     def __init__(self, test_case, resolution, with_particles,
-                 with_surface_restoring, long, three_layer):
+                 with_surface_restoring, long, three_layer, options=dict(),
+                 step_num=1):
         """
         Create a new test case
 
@@ -76,7 +77,8 @@ class Forward(Step):
 
         res_params = res_params[resolution]
 
-        super().__init__(test_case=test_case, name='forward', subdir=None,
+        super().__init__(test_case=test_case, name=f'forward_{step_num}',
+                         subdir=None,
                          ntasks=res_params['cores'],
                          min_tasks=res_params['min_tasks'])
         # make sure output is double precision
@@ -98,7 +100,6 @@ class Forward(Step):
         self.add_namelist_file('compass.ocean.tests.soma', 'namelist.analysis')
         self.add_streams_file('compass.ocean.tests.soma', 'streams.analysis')
 
-        options = dict()
         for option in ['dt', 'btr_dt', 'mom_del4', 'run_duration']:
             options[f'config_{option}'] = res_params[option]
         if with_particles:
@@ -135,7 +136,8 @@ class Forward(Step):
 
         if with_particles:
             self.add_output_file(
-                filename='analysis_members/lagrPartTrack.0001-01-01_00.00.00.nc')
+                filename='analysis_members/'
+                         'lagrPartTrack.0001-01-01_00.00.00.nc')
 
     def run(self):
         """
