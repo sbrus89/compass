@@ -45,7 +45,7 @@ class Forward(Step):
         """
         self.resolution = resolution
         self.with_particles = with_particles
-        res_params = {'32km': {'cores': 25,
+        res_params = {'32km': {'cores': 128,
                                'min_tasks': 3,
                                'dt': "'00:24:00'",
                                'btr_dt': "'0000_00:00:48'",
