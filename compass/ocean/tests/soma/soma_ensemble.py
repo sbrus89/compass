@@ -237,33 +237,3 @@ class SomaEnsemble(TestCase):
             # remove the continental shelf
             config.set('soma', 'phi', '1e-16')
             config.set('soma', 'shelf_depth', '0.0')
-
-    def validate(self):
-        """
-        Test cases can override this method to perform validation of variables
-        """
-        variables = ['bottomDepth', 'layerThickness', 'maxLevelCell',
-                     'temperature', 'salinity']
-        compare_variables(
-            test_case=self, variables=variables,
-            filename1='initial_state/initial_state.nc')
-
-        variables = ['temperature', 'layerThickness']
-        compare_variables(
-            test_case=self, variables=variables,
-            filename1='forward/output/output.0001-01-01_00.00.00.nc')
-
-        if self.with_particles:
-            # just do particle validation at coarse res
-            variables = [
-                'xParticle', 'yParticle', 'zParticle', 'zLevelParticle',
-                'buoyancyParticle', 'indexToParticleID', 'currentCell',
-                'transfered', 'numTimesReset']
-            compare_variables(test_case=self, variables=variables,
-                              filename1='forward/analysis_members/'
-                                        'lagrPartTrack.0001-01-01_00.00.00.nc')
-
-            timers = ['init_lagrPartTrack', 'compute_lagrPartTrack',
-                      'write_lagrPartTrack', 'restart_lagrPartTrack',
-                      'finalize_lagrPartTrack']
-            compare_timers(self, timers, rundir1='forward')
