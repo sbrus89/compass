@@ -122,13 +122,13 @@ class Forward(Step):
         self.add_namelist_options(options=options)
 
         self.add_input_file(filename='mesh.nc',
-                            target='../initial_state/culled_mesh.nc')
+                            target='../../initial_state/culled_mesh.nc')
         self.add_input_file(filename='init.nc',
-                            target='../initial_state/initial_state.nc')
+                            target='../../initial_state/initial_state.nc')
         self.add_input_file(filename='forcing.nc',
-                            target='../initial_state/forcing.nc')
+                            target='../../initial_state/forcing.nc')
         self.add_input_file(filename='graph.info',
-                            target='../initial_state/graph.info')
+                            target='../../initial_state/graph.info')
 
         self.add_model_as_input()
 

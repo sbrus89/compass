@@ -27,10 +27,11 @@ class Moc(Step):
         resolution : float
             The horizontal resolution (km) of the test case
         """
-        super().__init__(test_case=test_case, name=f'moc_{step_num}', subdir=f'forward_{step_num}/moc')
+        super().__init__(test_case=test_case, name=f'moc_{step_num}',
+                         subdir=f'forward_{step_num}/moc')
         self.resolution = resolution
 
-        self.add_input_file('../initial_state/initial_state.nc')
+        self.add_input_file('../../initial_state/initial_state.nc')
         self.add_input_file(
             '../forward/output/timeSeriesStatsMonthly.0001-01-01.nc')
         self.add_output_file('moc.nc')
@@ -43,14 +44,14 @@ class Moc(Step):
         in_dir = '../forward/output'
         out_dir = '.'
 
-        lat_min = self.config.getfloat('baroclinic_gyre', 'lat_min')
-        lat_max = self.config.getfloat('baroclinic_gyre', 'lat_max')
-        dlat = self.config.getfloat('baroclinic_gyre_post', 'dlat')
+        lat_min = self.config.getfloat('soma', 'lat_min')
+        lat_max = self.config.getfloat('soma', 'lat_max')
+        dlat = self.config.getfloat('soma', 'dlat')
         latBins = np.arange(lat_min + 2 * dlat,
                             lat_max + 2 * dlat, dlat)
         nz = self.config.getint('vertical_grid', 'vert_levels')
 
-        dsMesh = xarray.open_dataset('../initial_state/initial_state.nc')
+        dsMesh = xarray.open_dataset('../../initial_state/initial_state.nc')
 
         ds = xarray.open_mfdataset(
             f'{in_dir}/timeSeriesStatsMonthly*.nc',
