@@ -78,7 +78,7 @@ class Forward(Step):
         res_params = res_params[resolution]
 
         super().__init__(test_case=test_case, name=f'forward_{step_num}',
-                         subdir=None,
+                         subdir=f'forward_{step_num}/forward',
                          ntasks=res_params['cores'],
                          min_tasks=res_params['min_tasks'])
         # make sure output is double precision

@@ -4,6 +4,7 @@ from skopt.space import Space
 from compass.ocean.tests.soma.analysis import Analysis
 from compass.ocean.tests.soma.forward import Forward
 from compass.ocean.tests.soma.initial_state import InitialState
+from compass.ocean.tests.soma.moc import Moc
 from compass.testcase import TestCase
 from compass.validate import compare_timers, compare_variables
 
@@ -126,7 +127,7 @@ class SomaEnsemble(TestCase):
         options['config_GM_closure'] = "'constant'"
         options['config_Redi_closure'] = "'constant'"
         option_list.append(options)
-        
+
         for opt in x:
             options = {}
             options['config_GM_constant_kappa'] = '600.0'
@@ -146,7 +147,7 @@ class SomaEnsemble(TestCase):
             options['config_use_Redi'] = '.true.'
             options['config_submesoscale_enable'] = '.true.'
             option_list.append(options)
-        
+
         #for opt in scaled_sample:
         #    options = {}
         #    options['config_GM_constant_kappa'] = str(opt[0])
@@ -198,7 +199,7 @@ class SomaEnsemble(TestCase):
                 options['config_Redi_closure'] = "'constant'"
                 options['config_submesoscale_enable'] = '.true.'
                 option_list.append(options)
-        '''  
+        '''
         #options = {}
         #options['config_GM_constant_kappa'] = '1202.0'
         #options['config_Redi_constant_kappa'] = '400.0'
@@ -221,8 +222,11 @@ class SomaEnsemble(TestCase):
                 with_surface_restoring=with_surface_restoring, long=long,
                 three_layer=three_layer, options=options, step_num=i))
 
+            self.add_step(Moc(test_case=self, resolution=resolution, step_num=i))
+
         if with_particles:
             self.add_step(Analysis(test_case=self, resolution=resolution))
+
 
     def configure(self):
         """

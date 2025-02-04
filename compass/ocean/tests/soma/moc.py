@@ -15,7 +15,7 @@ class Moc(Step):
     resolution : float
         The horizontal resolution (km) of the test case
     """
-    def __init__(self, test_case, resolution):
+    def __init__(self, test_case, resolution, step_num=1):
         """
         Create the step
 
@@ -27,7 +27,7 @@ class Moc(Step):
         resolution : float
             The horizontal resolution (km) of the test case
         """
-        super().__init__(test_case=test_case, name='moc')
+        super().__init__(test_case=test_case, name=f'moc_{step_num}', subdir=f'forward_{step_num}/moc')
         self.resolution = resolution
 
         self.add_input_file('../initial_state/initial_state.nc')
