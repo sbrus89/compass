@@ -55,7 +55,6 @@
     <var name="velocityMeridional"/>
 </stream>
 
-</streams>
 
 <stream name="timeSeriesStatsMonthlyOutput"
         type="output"
@@ -110,3 +109,5 @@
         output_interval="stream:restart:output_interval" >
 
 </stream>
+
+</streams>
