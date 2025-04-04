@@ -23,9 +23,11 @@ import json
 from collections import deque
 from math import sqrt
 
+import jigsawpy
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+from scipy import interpolate
 from scipy.spatial import cKDTree
 from shapely import vectorized
 from shapely.geometry import LineString, Point, shape
@@ -33,6 +35,25 @@ from skimage.measure import label
 from skimage.morphology import medial_axis, remove_small_objects
 
 R = 6371220.0
+
+
+# Great South Bay
+# lonmin = -73.475
+# lonmax = -73.0
+# latmin = 40.60
+# latmax = 40.675
+
+# NY/NJ Bight
+# lonmin = -74.2
+# lonmax = -72.9
+# latmin = 39.9
+# latmax = 40.8
+
+# Cape Cod
+lonmin = -71.1
+lonmax = -69.9
+latmin = 41.2
+latmax = 42.1
 
 
 #####################
@@ -48,24 +69,6 @@ def read_topography(nc_file, topo_var='topo', x_var=None, y_var=None):
     Returns: topo: 2D numpy array of topography data.  X, Y: 2D coordinate
     arrays (or None) if coordinate variables are provided.
     """
-
-    # Great South Bay
-    # lonmin = -73.475
-    # lonmax = -73.0
-    # latmin = 40.60
-    # latmax = 40.675
-
-    # NY/NJ Bight
-    # lonmin = -74.2
-    # lonmax = -72.9
-    # latmin = 39.9
-    # latmax = 40.8
-
-    # Cape Cod
-    lonmin = -71.1
-    lonmax = -69.9
-    latmin = 41.2
-    latmax = 42.1
 
     ds_bathy = xr.open_dataset(nc_file)
     lon = ds_bathy.lon.values[:]
@@ -315,7 +318,7 @@ def extract_longest_centerline_per_label(nc_file, geojson_file,
     return centerlines, island_mask, X, Y
 
 
-def sample_line_offsets_variable(centerline, spacing, offset_distance):
+def sample_line_offsets_variable(centerline, spacing):
     """
     Sample points along a shapely LineString representing the centerline,
     using variable spacing.
@@ -336,8 +339,6 @@ def sample_line_offsets_variable(centerline, spacing, offset_distance):
       centerline     : shapely LineString object.
       spacing        : float or callable; if callable,
                        spacing(current_distance) -> next step size.
-      offset_distance: float, distance to offset the sample points
-                       perpendicularly.
 
     Returns:
       (left_points, right_points) where each is a list of shapely Points.
@@ -351,24 +352,32 @@ def sample_line_offsets_variable(centerline, spacing, offset_distance):
     # epsilon = total_length * 1e-6 if total_length * 1e-6 > 1e-8 else 1e-6
 
     sample_dists = []
+    distances = []
     d = 0.0
     while d < total_length:
         pt = centerline.interpolate(d)
         sample_dists.append(d)
+
         # Determine next spacing step
+        if callable(spacing):
+            spac = spacing((pt.x, pt.y))
+        else:
+            spac = spacing
 
-        step = xyz2lonlat_distance(spacing, pt.y)
+        step = xyz2lonlat_distance(spac, pt.y)
+        distances.append(step)
         d += step
-    print(sample_dists)
-    # Ensure the last point (end of centerline) is included
-    if sample_dists[-1] < total_length:
-        sample_dists.append(total_length)
 
-    for d in sample_dists:
+    # Ensure the last point (end of centerline) is included
+    # if sample_dists[-1] < total_length:
+    #    sample_dists.append(total_length)
+
+    for i, d in enumerate(sample_dists):
         pt = centerline.interpolate(d)
         x, y = pt.x, pt.y
 
-        epsilon = xyz2lonlat_distance(spacing, y)
+        spac = distances[i]
+        epsilon = spac
         # Estimate the tangent vector using a small forward
         # (or backward) offset.
         pt_next = centerline.interpolate(min(d + epsilon, total_length))
@@ -387,8 +396,8 @@ def sample_line_offsets_variable(centerline, spacing, offset_distance):
             continue
         tangent = (dx / norm, dy / norm)
         # Left normal is 90° counterclockwise rotation of tangent.
+        offset = 0.5 * distances[i]
         normal = (-tangent[1], tangent[0])
-        offset = xyz2lonlat_distance(offset_distance, y)
         left_pt = Point(x + offset * normal[0],
                         y + offset * normal[1])
         right_pt = Point(x - offset * normal[0],
@@ -399,7 +408,7 @@ def sample_line_offsets_variable(centerline, spacing, offset_distance):
     return left_points, right_points
 
 
-def generate_offset_points_variable(centerlines, spacing, offset_distance):
+def generate_offset_points_variable(centerlines, spacing):
     """
     Given an iterable of centerlines (shapely LineString objects),
     compute per-centerline offset points using variable spacing.
@@ -408,7 +417,6 @@ def generate_offset_points_variable(centerlines, spacing, offset_distance):
       centerlines    : iterable of shapely LineString objects.
       spacing        : float or callable (as described in
                        sample_line_offsets_variable).
-      offset_distance: float, the perpendicular offset distance.
 
     Returns:
       A dictionary mapping each centerline index to a tuple
@@ -418,8 +426,8 @@ def generate_offset_points_variable(centerlines, spacing, offset_distance):
     all_points = []
     result = []
     for idx, cl in enumerate(centerlines):
-        left_pts, right_pts = sample_line_offsets_variable(cl, spacing,
-                                                           offset_distance)
+        left_pts, right_pts = sample_line_offsets_variable(cl, spacing)
+
         result.append((left_pts, right_pts))
         for pt in left_pts:
             all_points.append([pt.x, pt.y])
@@ -429,7 +437,7 @@ def generate_offset_points_variable(centerlines, spacing, offset_distance):
     return all_points
 
 
-def average_close_points(points, tolerance):
+def average_close_points(points, tolerance, tol_frac):
     """
     Given an array of points (each point is [x, y]) and a distance tolerance,
     replaces any groups of points with pairwise distances less than tolerance
@@ -469,8 +477,13 @@ def average_close_points(points, tolerance):
     # For each point, query nearby points and union them.
     for i in range(n_points):
         # Query points within the tolerance. (This includes the point itself.)
+        x = points[i][0]
         y = points[i][1]
-        tol = xyz2lonlat_distance(tolerance, y)
+        if callable(tolerance):
+            spac = tolerance((x, y))
+        else:
+            spac = tolerance
+        tol = xyz2lonlat_distance(tol_frac * spac, y)
         indices = tree.query_ball_point(points[i], tol)
         for j in indices:
             if j > i:
@@ -538,6 +551,37 @@ def plot_linestrings(linestrings, image, X, Y, points, points_avg):
     plt.savefig('medial_axis.png')
 
 
+def write_init_jigsaw_file(points, outfile):
+
+    # Change to Cartesian coordinates
+    x, y, z = lonlat2xyz(points[:, 0], points[:, 1], R)
+
+    # Get coordinates and ID into structured array
+    #   (for use with np.savetxt)
+    pt_list = []
+    npt = x.size
+    for i in range(npt):
+        # ID of -1 specifies that node is fixed
+        pt_list.append((x[i], y[i], z[i], -1))
+    pt_type = np.dtype({'names': ['x', 'y', 'z', 'id'],
+                       'formats': [np.float64, np.float64,
+                                   np.float64, np.int32]})
+    pts = np.array(pt_list, dtype=pt_type)
+
+    # Write initial conditions file
+    f = open(outfile, 'w')
+    f.write('# Initial coordinates \n')
+    f.write('MSHID=3;EUCLIDEAN-MESH\n')
+    f.write('NDIMS=3\n')
+    f.write(f'POINT={npt}\n')
+    np.savetxt(f, pts, fmt='%.12e;%.12e;%.12e;%2i')
+    f.close()
+
+    init = jigsawpy.jigsaw_msh_t()
+    jigsawpy.loadmsh(outfile, init)
+    jigsawpy.savevtk("init.vtk", init)
+
+
 #####################
 # Command-line Interface
 #####################
@@ -551,18 +595,25 @@ def main():
     threshold = 0  # Adjust threshold based on your data
     xvar = 'lon'
     yvar = 'lat'
+    tol_frac = 0.5
 
     centerlines, mask, X, Y = extract_longest_centerline_per_label(
         nc_file, geojson_file, topo_var=variable_name,
         threshold=threshold, x_var=xvar, y_var=yvar
     )
 
-    spacing = 4000
-    offset_distance = 0.5 * spacing
-    points = generate_offset_points_variable(centerlines,
-                                             spacing, offset_distance)
-    points_avg = average_close_points(points, 0.5 * spacing)
+    spacing1 = 16000
+    spacing2 = 2000
+    spacing = ((lonmax - X) / (lonmax - lonmin)) * spacing1 \
+        + ((lonmin - X) / (lonmin - lonmax)) * spacing2
+    print(X.shape)
+    print(Y.shape)
+    print(spacing.shape)
+    spac = interpolate.RegularGridInterpolator((X[0, :], Y[:, 0]), spacing.T)
+    points = generate_offset_points_variable(centerlines, spac)
+    points_avg = average_close_points(points, spac, tol_frac)
     plot_linestrings(centerlines, mask, X, Y, points, points_avg)
+    write_init_jigsaw_file(points_avg, 'init.msh')
 
 
 if __name__ == "__main__":
