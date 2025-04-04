@@ -26,6 +26,7 @@ from math import sqrt
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+from scipy.spatial import cKDTree
 from shapely import vectorized
 from shapely.geometry import LineString, Point, shape
 from skimage.measure import label
@@ -55,10 +56,16 @@ def read_topography(nc_file, topo_var='topo', x_var=None, y_var=None):
     # latmax = 40.675
 
     # NY/NJ Bight
-    lonmin = -74.2
-    lonmax = -72.9
-    latmin = 39.9
-    latmax = 40.8
+    # lonmin = -74.2
+    # lonmax = -72.9
+    # latmin = 39.9
+    # latmax = 40.8
+
+    # Cape Cod
+    lonmin = -71.1
+    lonmax = -69.9
+    latmin = 41.2
+    latmax = 42.1
 
     ds_bathy = xr.open_dataset(nc_file)
     lon = ds_bathy.lon.values[:]
@@ -342,18 +349,17 @@ def sample_line_offsets_variable(centerline, spacing, offset_distance):
 
     # Use a small value to compute the numerical derivative for the tangent.
     # epsilon = total_length * 1e-6 if total_length * 1e-6 > 1e-8 else 1e-6
-    epsilon = spacing
 
     sample_dists = []
     d = 0.0
     while d < total_length:
+        pt = centerline.interpolate(d)
         sample_dists.append(d)
         # Determine next spacing step
-        if callable(spacing):
-            step = spacing(d)
-        else:
-            step = spacing
+
+        step = xyz2lonlat_distance(spacing, pt.y)
         d += step
+    print(sample_dists)
     # Ensure the last point (end of centerline) is included
     if sample_dists[-1] < total_length:
         sample_dists.append(total_length)
@@ -362,16 +368,19 @@ def sample_line_offsets_variable(centerline, spacing, offset_distance):
         pt = centerline.interpolate(d)
         x, y = pt.x, pt.y
 
+        epsilon = xyz2lonlat_distance(spacing, y)
         # Estimate the tangent vector using a small forward
         # (or backward) offset.
-        if d + epsilon <= total_length:
-            pt_next = centerline.interpolate(d + epsilon)
-            dx = pt_next.x - x
-            dy = pt_next.y - y
-        else:
-            pt_prev = centerline.interpolate(max(d - epsilon, 0))
-            dx = x - pt_prev.x
-            dy = y - pt_prev.y
+        pt_next = centerline.interpolate(min(d + epsilon, total_length))
+        dx_next = pt_next.x - x
+        dy_next = pt_next.y - y
+
+        pt_prev = centerline.interpolate(max(d - epsilon, 0))
+        dx_prev = x - pt_prev.x
+        dy_prev = y - pt_prev.y
+
+        dx = 0.5 * (dx_next + dx_prev)
+        dy = 0.5 * (dy_next + dy_prev)
 
         norm = np.hypot(dx, dy)
         if norm == 0:
@@ -379,10 +388,11 @@ def sample_line_offsets_variable(centerline, spacing, offset_distance):
         tangent = (dx / norm, dy / norm)
         # Left normal is 90° counterclockwise rotation of tangent.
         normal = (-tangent[1], tangent[0])
-        left_pt = Point(x + offset_distance * normal[0],
-                        y + offset_distance * normal[1])
-        right_pt = Point(x - offset_distance * normal[0],
-                         y - offset_distance * normal[1])
+        offset = xyz2lonlat_distance(offset_distance, y)
+        left_pt = Point(x + offset * normal[0],
+                        y + offset * normal[1])
+        right_pt = Point(x - offset * normal[0],
+                         y - offset * normal[1])
         left_points.append(left_pt)
         right_points.append(right_pt)
 
@@ -419,6 +429,74 @@ def generate_offset_points_variable(centerlines, spacing, offset_distance):
     return all_points
 
 
+def average_close_points(points, tolerance):
+    """
+    Given an array of points (each point is [x, y]) and a distance tolerance,
+    replaces any groups of points with pairwise distances less than tolerance
+    with the average of the points in the group.
+
+    Parameters:
+        points (array-like): Nx2 array-like of [x,y] coordinates.
+        tolerance (float): Distance tolerance for grouping points.
+
+    Returns:
+        np.ndarray: Nx2 array where each point has been replaced with the
+                    centriod of its grouping if it was within tolerance of
+                    any other.
+    """
+    points = np.asarray(points)
+    n_points = len(points)
+
+    # Union-Find Data Structure
+    parent = list(range(n_points))  # Initially, each point is its own parent.
+
+    def find(i):
+        # Find the root of the set containing i with path compression.
+        if parent[i] != i:
+            parent[i] = find(parent[i])
+        return parent[i]
+
+    def union(i, j):
+        # Union the sets containing i and j.
+        root_i = find(i)
+        root_j = find(j)
+        if root_i != root_j:
+            parent[root_j] = root_i
+
+    # Build a spatial index to search for close points quickly.
+    tree = cKDTree(points)
+
+    # For each point, query nearby points and union them.
+    for i in range(n_points):
+        # Query points within the tolerance. (This includes the point itself.)
+        y = points[i][1]
+        tol = xyz2lonlat_distance(tolerance, y)
+        indices = tree.query_ball_point(points[i], tol)
+        for j in indices:
+            if j > i:
+                union(i, j)
+
+    # After all unions, group points by their representative.
+    clusters = {}
+    for i in range(n_points):
+        root = find(i)
+        if root not in clusters:
+            clusters[root] = []
+        clusters[root].append(i)
+
+    # Create a new array for averaged points.
+    averaged_points = np.zeros_like(points)
+
+    # For each cluster, compute the centroid and assign it to
+    # all points in the cluster.
+    for cluster_indices in clusters.values():
+        cluster_coords = points[cluster_indices]
+        centroid = cluster_coords.mean(axis=0)
+        averaged_points[cluster_indices] = centroid
+
+    return averaged_points
+
+
 def lonlat2xyz(lon, lat, R):
 
     x = R * np.cos(np.radians(lon)) * np.cos(np.radians(lat))
@@ -436,7 +514,14 @@ def xyz2lonlat(x, y, z, R):
     return lon, lat
 
 
-def plot_linestrings(linestrings, image, X, Y, points):
+def xyz2lonlat_distance(L, lat):
+
+    h = np.degrees(L / (R * np.sqrt(1.0 + np.cos(np.radians(lat))**2)))
+
+    return h
+
+
+def plot_linestrings(linestrings, image, X, Y, points, points_avg):
     plt.figure(figsize=(10, 10))
     c = plt.contourf(X, Y, image, alpha=0.5)
     plt.colorbar(c)
@@ -445,6 +530,7 @@ def plot_linestrings(linestrings, image, X, Y, points):
         x, y = line.xy
         plt.plot(x, y, linewidth=2)
     plt.scatter(points[:, 0], points[:, 1], marker='.', color='k')
+    plt.scatter(points_avg[:, 0], points_avg[:, 1], marker='.', color='r')
     plt.title('Medial Axis of Barrier Islands')
     plt.xlabel('X Coordinate')
     plt.ylabel('Y Coordinate')
@@ -471,11 +557,12 @@ def main():
         threshold=threshold, x_var=xvar, y_var=yvar
     )
 
-    spacing = .01
+    spacing = 4000
     offset_distance = 0.5 * spacing
     points = generate_offset_points_variable(centerlines,
                                              spacing, offset_distance)
-    plot_linestrings(centerlines, mask, X, Y, points)
+    points_avg = average_close_points(points, 0.5 * spacing)
+    plot_linestrings(centerlines, mask, X, Y, points, points_avg)
 
 
 if __name__ == "__main__":
