@@ -3,3 +3,4 @@ config_ocean_run_mode = 'init'
 config_realistic_coriolis_parameter = .true.
 config_use_bulk_wind_stress = .true.
 config_soma_use_surface_temp_restoring = .true.
+config_use_activeTracers_surface_restoring = .true.
