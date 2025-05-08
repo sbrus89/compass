@@ -34,7 +34,7 @@ from shapely.geometry import LineString, Point, shape
 from skimage.measure import label
 from skimage.morphology import medial_axis, remove_small_objects
 
-R = 6371220.0
+R = 6371.220
 
 
 # Great South Bay
@@ -43,17 +43,22 @@ R = 6371220.0
 # latmin = 40.60
 # latmax = 40.675
 
-# NY/NJ Bight
-# lonmin = -74.2
-# lonmax = -72.9
-# latmin = 39.9
-# latmax = 40.8
+## NY/NJ Bight
+#lonmin = -74.2
+#lonmax = -72.9
+#latmin = 39.9
+#latmax = 40.8
 
 # Cape Cod
-lonmin = -71.1
-lonmax = -69.9
-latmin = 41.2
-latmax = 42.1
+#lonmin = -71.1
+#lonmax = -69.9
+#latmin = 41.2
+#latmax = 42.1
+
+lonmin = -180.0
+lonmax = 180.0
+latmin = -90.0
+latmax = 90.0
 
 
 #####################
@@ -73,6 +78,10 @@ def read_topography(nc_file, topo_var='topo', x_var=None, y_var=None):
     ds_bathy = xr.open_dataset(nc_file)
     lon = ds_bathy.lon.values[:]
     lat = ds_bathy.lat.values[:]
+    lonmin = np.min(lon)
+    lonmax = np.max(lon)
+    latmin = np.min(lat)
+    latmax = np.max(lat)
     lon_idx, = np.where((lon >= lonmin) & (lon <= lonmax))
     lat_idx, = np.where((lat >= latmin) & (lat <= latmax))
 
@@ -101,7 +110,7 @@ def threshold_island(topo, threshold, regions):
     return island
 
 
-def compute_region_masks(geojson_file, lon_grid, lat_grid):
+def compute_region_masks(geojson_features, lon_grid, lat_grid):
     """
     Computes a mask (boolean NumPy array) for each region (polygon) in the
     GeoJSON file.  The mask array has the same shape as the NetCDF grid.
@@ -113,22 +122,16 @@ def compute_region_masks(geojson_file, lon_grid, lat_grid):
         otherwise the index of the polygon.
     """
 
-    # Load the GeoJSON file using geopandas
-    with open(geojson_file, 'r') as f:
-        geojson_data = json.load(f)
-    features = geojson_data['features']
 
-    region_masks = []
     region_mask = np.zeros_like(lon_grid)
-    for idx, feature in enumerate(features):
+    for idx, feature in enumerate(geojson_features):
         geom = shape(feature['geometry'])
 
         # Use shapely.vectorized.contains to compute a boolean mask.
         # Note: shapely.vectorized.contains expects x (lon) and y (lat) arrays.
         mask = vectorized.contains(geom, lon_grid, lat_grid)
         region_mask = np.logical_or(region_mask, mask)
-
-        region_masks.append(mask)
+        print(np.max(region_mask))
 
     return region_mask
 
@@ -266,7 +269,7 @@ def centerline_to_linestring(path, X=None, Y=None):
 #####################
 # Extraction for Each Label
 #####################
-def extract_longest_centerline_per_label(nc_file, geojson_file,
+def extract_longest_centerline_per_label(nc_file, geojson_features,
                                          topo_var='topo', threshold=0.0,
                                          x_var=None, y_var=None):
     """
@@ -280,11 +283,12 @@ def extract_longest_centerline_per_label(nc_file, geojson_file,
         longest center line as a shapely LineString.
     """
     topo, X, Y = read_topography(nc_file, topo_var, x_var, y_var)
-    regions = compute_region_masks(geojson_file, X, Y)
+    regions = compute_region_masks(geojson_features, X, Y)
     island_mask = threshold_island(topo, threshold, regions)
 
     # Label islands (using connectivity=2 for 8-connectivity)
-    island_labels = label(island_mask, connectivity=2)
+    island_labels, num = label(island_mask, connectivity=2, return_num=True)
+    print(num)
 
     centerlines = []
     unique_labels = np.unique(island_labels)
@@ -396,7 +400,7 @@ def sample_line_offsets_variable(centerline, spacing):
             continue
         tangent = (dx / norm, dy / norm)
         # Left normal is 90° counterclockwise rotation of tangent.
-        offset = 0.5 * distances[i]
+        offset = 0.25 * np.sqrt(3.0) * distances[i]
         normal = (-tangent[1], tangent[0])
         left_pt = Point(x + offset * normal[0],
                         y + offset * normal[1])
@@ -431,8 +435,10 @@ def generate_offset_points_variable(centerlines, spacing):
         result.append((left_pts, right_pts))
         for pt in left_pts:
             all_points.append([pt.x, pt.y])
-        for pt in right_pts:
-            all_points.append([pt.x, pt.y])
+        for i in range(len(right_pts)-1):
+            x = 0.5*(right_pts[i].x + right_pts[i+1].x)
+            y = 0.5*(right_pts[i].y + right_pts[i+1].y)
+            all_points.append([x, y])
     all_points = np.array(all_points)
     return all_points
 
@@ -534,7 +540,7 @@ def xyz2lonlat_distance(L, lat):
     return h
 
 
-def plot_linestrings(linestrings, image, X, Y, points, points_avg):
+def plot_linestrings(linestrings, image, X, Y, points=None, points_avg=None):
     plt.figure(figsize=(10, 10))
     c = plt.contourf(X, Y, image, alpha=0.5)
     plt.colorbar(c)
@@ -542,8 +548,10 @@ def plot_linestrings(linestrings, image, X, Y, points, points_avg):
     for line in linestrings:
         x, y = line.xy
         plt.plot(x, y, linewidth=2)
-    plt.scatter(points[:, 0], points[:, 1], marker='.', color='k')
-    plt.scatter(points_avg[:, 0], points_avg[:, 1], marker='.', color='r')
+    if points:
+        plt.scatter(points[:, 0], points[:, 1], marker='.', color='k')
+    if points_avg:
+        plt.scatter(points_avg[:, 0], points_avg[:, 1], marker='.', color='r')
     plt.title('Medial Axis of Barrier Islands')
     plt.xlabel('X Coordinate')
     plt.ylabel('Y Coordinate')
@@ -597,13 +605,21 @@ def main():
     yvar = 'lat'
     tol_frac = 0.5
 
+    # Load the GeoJSON file using geopandas
+    with open(geojson_file, 'r') as f:
+        geojson_data = json.load(f)
+    geojson_features = geojson_data['features']
+
     centerlines, mask, X, Y = extract_longest_centerline_per_label(
-        nc_file, geojson_file, topo_var=variable_name,
+        nc_file, geojson_features, topo_var=variable_name,
         threshold=threshold, x_var=xvar, y_var=yvar
     )
+    print("n centerlines")
+    print(len(centerlines))
+    plot_linestrings(centerlines, mask, X, Y)
 
-    spacing1 = 16000
-    spacing2 = 2000
+    spacing1 = 16.0
+    spacing2 = 2.0
     spacing = ((lonmax - X) / (lonmax - lonmin)) * spacing1 \
         + ((lonmin - X) / (lonmin - lonmax)) * spacing2
     print(X.shape)
@@ -611,6 +627,7 @@ def main():
     print(spacing.shape)
     spac = interpolate.RegularGridInterpolator((X[0, :], Y[:, 0]), spacing.T)
     points = generate_offset_points_variable(centerlines, spac)
+    print(points.shape)
     points_avg = average_close_points(points, spac, tol_frac)
     plot_linestrings(centerlines, mask, X, Y, points, points_avg)
     write_init_jigsaw_file(points_avg, 'init.msh')

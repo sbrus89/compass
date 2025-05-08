@@ -230,7 +230,10 @@ class QuasiUniformSphericalMeshStep(SphericalBaseStep):
         """
         cell_width, lon, lat = self.build_cell_width_lat_lon()
         self.save_and_plot_cell_width(lon, lat, cell_width)
-
+        print(self.opts.mesh_file)
+        print(self.opts.geom_file)
+        print(self.opts.jcfg_file)
+        print(self.opts.hfun_file)
         self.make_jigsaw_mesh(lon, lat, cell_width)
 
         # do the rest of the step (converting to the MPAS base mesh)
