@@ -5,3 +5,6 @@ config_use_bulk_wind_stress = .true.
 config_soma_use_surface_temp_restoring = .true.
 config_use_activeTracers_surface_restoring = .true.
 config_soma_surface_temp_restoring_latitude_gradient = -0.5
+config_soma_domain_width = 2.5e6
+config_soma_center_latitude = 45.0
+config_soma_center_longitude = 0.0
