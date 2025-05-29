@@ -1,10 +1,9 @@
 import xarray
-
 from mpas_tools.io import write_netcdf
 from mpas_tools.mesh.conversion import convert, cull
 
-from compass.step import Step
 from compass.model import run_model
+from compass.step import Step
 
 
 class InitialState(Step):
@@ -67,8 +66,7 @@ class InitialState(Step):
             raise ValueError(f'Unexpected SOMA resolution: {resolution}')
 
         self.add_input_file(filename='base_mesh.nc',
-                            target=mesh_filenames[resolution],
-                            database='mesh_database')
+                            target='../mesh/mesh.nc')
 
         self.add_model_as_input()
 

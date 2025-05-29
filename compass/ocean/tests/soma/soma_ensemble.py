@@ -4,6 +4,7 @@ from skopt.space import Space
 from compass.ocean.tests.soma.analysis import Analysis
 from compass.ocean.tests.soma.forward import Forward
 from compass.ocean.tests.soma.initial_state import InitialState
+from compass.ocean.tests.soma.mesh import Mesh
 from compass.ocean.tests.soma.moc import Moc
 from compass.testcase import TestCase
 from compass.validate import compare_timers, compare_variables
@@ -92,6 +93,8 @@ class SomaEnsemble(TestCase):
         subdir = f'{resolution}/{name}'
 
         super().__init__(test_group=test_group, name=name, subdir=subdir)
+
+        self.add_step(Mesh(test_case=self, resolution=resolution))
 
         self.add_step(InitialState(
             test_case=self, resolution=resolution,
