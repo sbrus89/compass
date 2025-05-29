@@ -3,6 +3,7 @@ from mpas_tools.io import write_netcdf
 from mpas_tools.mesh.conversion import convert, cull
 
 from compass.model import run_model
+from compass.model import make_graph_file
 from compass.step import Step
 
 
@@ -142,6 +143,10 @@ class InitialState(Step):
 
         for out_name in ['namelist_mark_land.ocean', 'namelist.ocean']:
             self.update_namelist_at_runtime(options=options, out_name=out_name)
+
+        make_graph_file(mesh_filename='base_mesh.nc',
+                        graph_filename='base_graph.info')
+
         ds_mesh = convert(xarray.open_dataset('base_mesh.nc'),
                           graphInfoFileName='base_graph.info',
                           logger=self.logger)
@@ -152,9 +157,12 @@ class InitialState(Step):
                   graph_file='base_graph.info')
 
         ds_mesh = cull(xarray.open_dataset('masked_initial_state.nc'),
-                       graphInfoFileName='graph.info',
+                       graphInfoFileName='base_graph.info',
                        logger=self.logger)
         write_netcdf(ds_mesh, 'culled_mesh.nc')
+
+        make_graph_file(mesh_filename='culled_mesh.nc',
+                        graph_filename='graph.info')
 
         run_model(self, namelist='namelist.ocean', streams='streams.ocean',
                   graph_file='graph.info')
