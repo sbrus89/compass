@@ -39,7 +39,7 @@ class InitialState(Step):
         """
         self.resolution = resolution
 
-        res_params = {'32km': {'cores': 4,
+        res_params = {'32km': {'cores': 128,
                                'min_tasks': 1},
                       '16km': {'cores': 10,
                                'min_tasks': 1},
@@ -82,7 +82,7 @@ class InitialState(Step):
             options['config_soma_vert_levels'] = '3'
             options['config_vertical_grid'] = "'uniform'"
         else:
-            options['config_soma_vert_levels'] = '60'
+            options['config_soma_vert_levels'] = '31'
             options['config_vertical_grid'] = "'60layerPHC'"
 
         self.add_namelist_file(package, 'namelist.init', mode='init',

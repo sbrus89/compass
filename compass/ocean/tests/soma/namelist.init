@@ -8,3 +8,7 @@ config_soma_surface_temp_restoring_latitude_gradient = -0.5
 config_soma_domain_width = 2.5e6
 config_soma_center_latitude = 45.0
 config_soma_center_longitude = 0.0
+config_soma_phi = 0.02
+config_soma_bottom_depth = 3400
+config_soma_shelf_depth = 100.0
+config_soma_vert_levels = 31
