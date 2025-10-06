@@ -13,6 +13,7 @@ from compass.ocean.tests.global_ocean.mesh.fris02to60 import FRIS02to60BaseMesh
 from compass.ocean.tests.global_ocean.mesh.fris04to60 import FRIS04to60BaseMesh
 from compass.ocean.tests.global_ocean.mesh.fris08to60 import FRIS08to60BaseMesh
 from compass.ocean.tests.global_ocean.mesh.kuroshio import KuroshioBaseMesh
+from compass.ocean.tests.global_ocean.mesh.mab import MABBaseMesh
 from compass.ocean.tests.global_ocean.mesh.qu import (
     IcosMeshFromConfigStep,
     QUMeshFromConfigStep,
@@ -142,6 +143,8 @@ class Mesh(TestCase):
             base_mesh_step = KuroshioBaseMesh(self, name=name, subdir=subdir)
         elif mesh_name in ['WC14', 'WCwISC14']:
             base_mesh_step = WC14BaseMesh(self, name=name, subdir=subdir)
+        elif mesh_name in ['MAB']:
+            base_mesh_step = MABBaseMesh(self, name=name, subdir=subdir)
         else:
             raise ValueError(f'Unknown mesh name {mesh_name}')
 
