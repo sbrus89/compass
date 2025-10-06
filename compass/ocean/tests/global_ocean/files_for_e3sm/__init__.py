@@ -116,7 +116,7 @@ class FilesForE3SM(TestCase):
         self.add_step(DiagnosticMaps(test_case=self))
         self.add_step(DiagnosticMasks(test_case=self))
         self.add_step(RemapIcebergClimatology(test_case=self))
-        self.add_step(RemapIceShelfMelt(test_case=self, init=init))
+        # self.add_step(RemapIceShelfMelt(test_case=self, init=init))
         self.add_step(AddTotalIcebergIceShelfMelt(test_case=self))
         self.add_step(RemapSeaSurfaceSalinityRestoring(test_case=self))
         self.add_step(RemapTidalMixing(test_case=self))
