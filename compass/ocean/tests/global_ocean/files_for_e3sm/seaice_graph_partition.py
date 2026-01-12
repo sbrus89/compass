@@ -163,6 +163,7 @@ def _make_mapping_file(in_mesh_filename, in_mesh_name, out_mesh_filename,
         src_descriptor=in_descriptor,
         dst_descriptor=out_descriptor,
         parallel_exec=parallel_executable,
+        use_tmp=False
     )
 
     remapper.build_map(logger=logger)

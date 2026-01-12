@@ -217,6 +217,7 @@ def _make_mapping_file(mesh_name, out_grid_name, mesh_filename, out_descriptor,
         src_descriptor=in_descriptor,
         dst_descriptor=out_descriptor,
         parallel_exec=parallel_executable,
+        use_tmp=False,
     )
     remapper.build_map(logger=logger)
 
@@ -232,5 +233,6 @@ def _make_mapping_file(mesh_name, out_grid_name, mesh_filename, out_descriptor,
         src_descriptor=in_descriptor,
         dst_descriptor=out_descriptor,
         parallel_exec=parallel_executable,
+        use_tmp=False,
     )
     remapper.build_map(logger=logger)

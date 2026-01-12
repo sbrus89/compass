@@ -153,6 +153,7 @@ class RemapIcebergClimatology(FilesForE3SMStep):
             src_descriptor=src_descriptor,
             dst_descriptor=dst_descriptor,
             parallel_exec=parallel_executable,
+            use_tmp=False,
         )
 
         remapper.build_map(logger=logger)
