@@ -78,8 +78,13 @@ class RemapBathymetry(Step):
             h = h / 1000.0
             floodplain = h < floodplain_resolution
 
+            outside_floodplain_min = config.getfloat(
+                'spherical_mesh',
+                'min_depth_outside_floodplain')
+
             bottomDepthObserved[~floodplain] = \
-                np.minimum(bottomDepthObserved[~floodplain], -0.1)
+                np.minimum(bottomDepthObserved[~floodplain],
+                           -outside_floodplain_min)
 
         # Write to mesh file
         nc_mesh.variables['bottomDepthObserved'][:] = bottomDepthObserved
