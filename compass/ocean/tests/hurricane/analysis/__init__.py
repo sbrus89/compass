@@ -75,40 +75,46 @@ class Analysis(Step):
             self.adjust_min_date = '2012 10 01 00 00'
             self.adjust_max_date = '2012 10 25 00 00'
 
-            filename = 'sandy_stations.json'
-            with resources.open_text(package, filename)as stations_file:
-                self.observations = json.load(stations_file)
+        elif self.storm == 'irene':
+            self.run_min_date = '2011 08 01 00 00'
+            self.run_max_date = '2011 09 15 00 00'
+            self.adjust_min_date = '2011 08 20 00 00'
+            self.adjust_max_date = '2011 09 05 00 00'
 
-            for obs in self.observations:
-                os.makedirs(f'{self.work_dir}/{obs}_data', exist_ok=True)
+        filename = f'{self.storm}_stations.json'
+        with resources.open_text(package, filename)as stations_file:
+            self.observations = json.load(stations_file)
+
+        for obs in self.observations:
+            os.makedirs(f'{self.work_dir}/{obs}_data', exist_ok=True)
+            self.add_input_file(
+                filename=f'{obs}_stations.txt',
+                target=f'{self.storm}_stations/{obs}_stations.txt',
+                database='hurricane')
+            for sta in self.observations[obs]:
                 self.add_input_file(
-                    filename=f'{obs}_stations.txt',
-                    target=f'sandy_stations/{obs}_stations.txt',
+                    filename=f'{obs}_data/{sta}.txt',
+                    target=f'{self.storm}_validation/'
+                           f'{obs}_stations/{sta}.txt',
                     database='hurricane')
-                for sta in self.observations[obs]:
-                    self.add_input_file(
-                        filename=f'{obs}_data/{sta}.txt',
-                        target=f'sandy_validation/'
-                               f'{obs}_stations/{sta}.txt',
-                        database='hurricane')
 
-            package = 'compass.ocean.tests.hurricane.init'
-            filename = 'bathy_data.json'
-            with resources.open_text(package, filename) as bathy_file:
-                self.bathy_files = json.load(bathy_file)
+        package = 'compass.ocean.tests.hurricane.init'
+        filename = 'bathy_data.json'
+        with resources.open_text(package, filename) as bathy_file:
+            self.bathy_files = json.load(bathy_file)
 
-            os.makedirs(f'{self.work_dir}/NCEI_data', exist_ok=True)
-            os.makedirs(f'{self.work_dir}/LULC_data', exist_ok=True)
-            for i, dem in enumerate(self.bathy_files["NCEI"]):
-                self.add_input_file(
-                    filename=f'NCEI_data/{dem}',
-                    target=f'ncei/{dem}',
-                    database='bathymetry_database')
+        os.makedirs(f'{self.work_dir}/NCEI_data', exist_ok=True)
+        os.makedirs(f'{self.work_dir}/LULC_data', exist_ok=True)
+        for i, dem in enumerate(self.bathy_files["NCEI"]):
+            self.add_input_file(
+                filename=f'NCEI_data/{dem}',
+                target=f'ncei/{dem}',
+                database='bathymetry_database')
 
-                self.add_input_file(
-                    filename=f'LULC_data/landuse_from_{dem}',
-                    target=f'LULC/landuse_from_{dem}',
-                    database='hurricane')
+            self.add_input_file(
+                filename=f'LULC_data/landuse_from_{dem}',
+                target=f'LULC/landuse_from_{dem}',
+                database='hurricane')
 
     def read_pointstats(self, pointstats_file):
         """
@@ -215,15 +221,17 @@ class Analysis(Step):
         cnt = 0.0
         for i in range(obs_data['datetime'].size):
             if obs_data['datetime'][i] < adjust_max_date:
-                val = val + obs_data['ssh'][i]
-                cnt = cnt + 1.0
+                if val < 99.0:
+                    val = val + obs_data['ssh'][i]
+                    cnt = cnt + 1.0
         if cnt > 0.0:
             mean = val / cnt
         else:
             mean = 0.0
 
         # Correct observations for mean sea level
-        obs_data['ssh'] = obs_data['ssh'] - mean
+        mask = obs_data['ssh'] < 99.0
+        obs_data['ssh'][mask] = obs_data['ssh'][mask] - mean
 
     def run(self):
         """

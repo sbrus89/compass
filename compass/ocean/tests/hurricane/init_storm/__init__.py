@@ -1,18 +1,16 @@
 import os
 
 from compass.ocean.tests.hurricane.configure import configure_hurricane
-from compass.ocean.tests.hurricane.init.initial_state import InitialState
-from compass.ocean.tests.hurricane.init.interpolate_mannings_n import (
-    InterpolateManningsN,
+from compass.ocean.tests.hurricane.init_storm.create_pointstats_file import (
+    CreatePointstatsFile,
 )
-from compass.ocean.tests.tides.init.calculate_wave_drag import (
-    CalculateWaveDrag,
+from compass.ocean.tests.hurricane.init_storm.interpolate_atm_forcing import (
+    InterpolateAtmForcing,
 )
-from compass.ocean.tests.tides.init.remap_bathymetry import RemapBathymetry
 from compass.testcase import TestCase
 
 
-class Init(TestCase):
+class InitStorm(TestCase):
     """
     A test case for creating initial conditions on a global MPAS-Ocean mesh
 
@@ -21,7 +19,7 @@ class Init(TestCase):
     mesh : compass.ocean.tests.hurricane.mesh.Mesh
         The test case that creates the mesh used by this test case
     """
-    def __init__(self, test_group, mesh, use_lts, wetdry):
+    def __init__(self, test_group, mesh, storm, use_lts):
         """
         Create the test case
 
@@ -40,29 +38,21 @@ class Init(TestCase):
             Whether local time-stepping is used
         """
 
-        self.mesh = mesh
-        self.use_lts = use_lts
-
         if use_lts == 'LTS':
-            name = 'init_lts'
+            name = f'init_{storm}_lts'
         elif use_lts == 'FB_LTS':
-            name = 'init_fblts'
-        elif wetdry == 'subgrid':
-            name = 'init_subgrid'
+            name = f'init_{storm}_fblts'
         else:
-            name = 'init'
+            name = f'init_{storm}'
+        self.mesh = mesh
         mesh_name = mesh.mesh_name
         subdir = os.path.join(mesh_name, name)
         super().__init__(test_group=test_group, name=name, subdir=subdir)
 
-        self.add_step(CalculateWaveDrag(test_case=self, mesh=mesh))
-        self.add_step(RemapBathymetry(test_case=self, mesh=mesh,
-                                      limit_bathy_outside_refinement=True))
-        init = InitialState(test_case=self, mesh=mesh,
-                            use_lts=use_lts, wetdry=wetdry)
-        self.add_step(init)
-        self.add_step(InterpolateManningsN(test_case=self,
-                      init=init, wetdry=wetdry))
+        self.add_step(InterpolateAtmForcing(test_case=self, mesh=mesh,
+                                            storm=storm, use_lts=use_lts))
+        self.add_step(CreatePointstatsFile(test_case=self, mesh=mesh,
+                                           storm=storm, use_lts=use_lts))
 
     def configure(self):
         """

@@ -18,7 +18,8 @@ class Forward(TestCase):
     init : compass.ocean.tests.hurricane.init.Init
         The test case that produces the initial condition for this run
     """
-    def __init__(self, test_group, mesh, storm, init, use_lts, wetdry):
+    def __init__(self, test_group, mesh, storm, init,
+                 init_storm, use_lts, wetdry):
         """
         Create test case
 
@@ -57,7 +58,9 @@ class Forward(TestCase):
 
         step = ForwardStep(test_case=self,
                            mesh=mesh,
+                           storm=storm,
                            init=init,
+                           init_storm=init_storm,
                            use_lts=use_lts,
                            wetdry=wetdry)
 

@@ -23,7 +23,7 @@ class CreatePointstatsFile(Step):
         Name of output file contiaining pointstats information
 
     """
-    def __init__(self, test_case, mesh, storm):
+    def __init__(self, test_case, mesh, storm, use_lts):
         """
         Create the step
 
@@ -42,16 +42,25 @@ class CreatePointstatsFile(Step):
                          ntasks=1, min_tasks=1, openmp_threads=1)
 
         self.mesh_file = 'mesh.nc'
-        if storm == 'sandy':
+        if (storm == 'sandy') | (storm == 'irene'):
             self.station_files = ['NOAA-COOPS_stations.txt',
                                   'USGS_stations.txt']
         self.pointstats_file = 'points.nc'
 
         mesh_path = mesh.steps['cull_mesh'].path
+        if not use_lts:
 
-        self.add_input_file(
-            filename=self.mesh_file,
-            work_dir_target=f'{mesh_path}/culled_mesh.nc')
+            self.add_input_file(
+                filename='mesh.nc',
+                work_dir_target=f'{mesh_path}/culled_mesh.nc')
+
+        else:
+
+            mesh_path = mesh.steps['lts_regions'].path
+
+            self.add_input_file(
+                filename='mesh.nc',
+                work_dir_target=f'{mesh_path}/lts_mesh.nc')
 
         for file in self.station_files:
             self.add_input_file(

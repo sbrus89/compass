@@ -20,8 +20,8 @@ class ForwardStep(Step):
     use_lts: bool
         Whether local time-stepping is used
     """
-    def __init__(self, test_case, mesh, init, use_lts, wetdry,
-                 name='forward', subdir=None):
+    def __init__(self, test_case, mesh, storm, init, init_storm, use_lts,
+                 wetdry, name='forward', subdir=None):
         """
         Create a new step
 
@@ -85,6 +85,27 @@ class ForwardStep(Step):
                 'compass.ocean.tests.hurricane.forward',
                 'streams.ocean_subgrid')
 
+        options = {}
+        forcing_start = 'config_time_varying_atmospheric_forcing_start_time'
+        forcing_ref = 'config_time_varying_atmospheric_forcing_reference_time'
+        tidal_ref = 'config_tidal_potential_reference_time'
+        if storm == 'sandy':
+            options['config_start_time'] = '2012-10-10_00:00:00'
+            options['config_stop_time'] = '2012-11-03_00:00:00'
+            options[forcing_start] = '2012-10-10_00:00:00'
+            options[forcing_ref] = '2012-10-10_00:00:00'
+            options[tidal_ref] = '2012-10-10_00:00:00'
+        elif storm == 'irene':
+            options['config_start_time'] = '2011-08-01_00:00:00'
+            options['config_stop_time'] = '2011-09-15_00:00:00'
+            options[forcing_start] = '2011-08-01_00:00:00'
+            options[forcing_ref] = '2011-08-01_00:00:00'
+            options[tidal_ref] = '2011-08-01_00:00:00'
+        else:
+            raise ValueError(f'storm {storm} not supported')
+
+        self.add_namelist_options(options)
+
         if wetdry == 'subgrid':
             initial_state_target = \
                 f'{init.path}/initial_state/ocean_subgrid_final.nc'
@@ -95,7 +116,8 @@ class ForwardStep(Step):
                             work_dir_target=initial_state_target)
         self.add_input_file(
             filename='atmospheric_forcing.nc',
-            work_dir_target=f'{init.path}/interpolate/atmospheric_forcing.nc')
+            work_dir_target=f'{init_storm.path}/interpolate_atm_forcing/'
+                            'atmospheric_forcing.nc')
 
         file_in = 'topographic_wave_drag.nc'
         self.add_input_file(
@@ -104,7 +126,7 @@ class ForwardStep(Step):
 
         self.add_input_file(
             filename='points.nc',
-            work_dir_target=f'{init.path}/pointstats/points.nc')
+            work_dir_target=f'{init_storm.path}/pointstats/points.nc')
         self.add_input_file(
             filename='graph.info',
             work_dir_target=f'{init.path}/initial_state/graph.info')

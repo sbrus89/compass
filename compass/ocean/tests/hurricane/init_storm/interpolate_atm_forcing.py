@@ -39,7 +39,7 @@ class InterpolateAtmForcing(Step):
         Name of mesh file
 
     """
-    def __init__(self, test_case, mesh, storm):
+    def __init__(self, test_case, mesh, storm, use_lts):
         """
         Create the step
 
@@ -54,7 +54,8 @@ class InterpolateAtmForcing(Step):
         storm : str
             The name of the storm to setup
         """
-        super().__init__(test_case=test_case, name='interpolate',
+        super().__init__(test_case=test_case,
+                         name='interpolate_atm_forcing',
                          ntasks=1, min_tasks=1, openmp_threads=1)
 
         self.plot = True
@@ -75,7 +76,21 @@ class InterpolateAtmForcing(Step):
             target=f'{storm}_prmsl.nc',
             database='initial_condition_database')
 
-        mesh_path = mesh.steps['cull_mesh'].path
+        if not use_lts:
+
+            mesh_path = mesh.steps['cull_mesh'].path
+
+            self.add_input_file(
+                filename='mesh.nc',
+                work_dir_target=f'{mesh_path}/culled_mesh.nc')
+
+        else:
+
+            mesh_path = mesh.steps['lts_regions'].path
+
+            self.add_input_file(
+                filename='mesh.nc',
+                work_dir_target=f'{mesh_path}/lts_mesh.nc')
 
         self.add_input_file(
             filename='mesh.nc',
@@ -117,10 +132,12 @@ class InterpolateAtmForcing(Step):
             data[i, 0:-1, 0:-1] = np.flipud(data_nc.variables[var][i, :, :])
             data[i, -1, :] = data[i, -2, ::-1]
             data[i, :, -1] = data[i, :, 0]
+            print(np.min(data), np.max(data))
 
             interp_data[i, :] = interp_bilin(lon_data, lat_data,
                                              data[i, :, :],
                                              lon_grid, lat_grid)
+            print(np.min(interp_data), np.max(interp_data))
 
         # Deal with time
         ref_date = data_nc.variables['time'].getncattr('units')
@@ -263,7 +280,7 @@ class InterpolateAtmForcing(Step):
         # Plot atmopheric pressure
         for i in range(len(xtime)):
             if i % self.plot_interval == 0:
-                press_data = (p_data[0], p_data[1], p_data[2][i, :])
+                press_data = (p_data[0], p_data[1], p_data[2][i, :, :])
                 press_interp = (p_interp[0], p_interp[1], p_interp[2][i, :])
                 self.plot_interp_data(press_data, press_interp,
                                       'atmospheric pressure', 'pres',

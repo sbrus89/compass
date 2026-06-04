@@ -22,7 +22,7 @@ class InterpolateManningsN(Step):
         Name of mesh file
 
     """
-    def __init__(self, test_case, init):
+    def __init__(self, test_case, init, wetdry):
         """
         Create the step
 
@@ -48,9 +48,14 @@ class InterpolateManningsN(Step):
             target='gstofs_mannings_n.nc',
             database='hurricane')
 
-        self.add_input_file(
-            filename=self.grid_file,
-            work_dir_target=f'{init.path}/ocean_subgrid_final.nc')
+        if wetdry == 'subgrid':
+            self.add_input_file(
+                filename=self.grid_file,
+                work_dir_target=f'{init.path}/ocean_subgrid_final.nc')
+        else:
+            self.add_input_file(
+                filename=self.grid_file,
+                work_dir_target=f'{init.path}/ocean.nc')
 
     def interpolate_data(self, grid_file, data_file):
         """
